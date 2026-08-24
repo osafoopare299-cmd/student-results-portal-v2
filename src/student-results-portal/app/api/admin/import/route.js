@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+// Administrator-only Microsoft Forms import endpoint.
 import * as XLSX from 'xlsx';
 import { isAdmin } from '../../../../lib/admin-auth';
 import { getSql } from '../../../../lib/db';

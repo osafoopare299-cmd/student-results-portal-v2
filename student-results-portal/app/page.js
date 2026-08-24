@@ -36,26 +36,26 @@ function ResultCard({ result, index }) {
         </div>
         <div className="scoreCopy">
           <span>Overall score</span>
-          <strong>{Number(result.overall).toFixed(1)} <small>/ 105</small></strong>
+          <strong>{Number(result.overall).toFixed(1)} <small>/ {Number(result.overallMax).toFixed(1)}</small></strong>
           {result.grade && <p>Grade <b>{result.grade}</b></p>}
         </div>
       </div>
 
       <section className="section">
         <div className="sectionTitle"><BookOpenCheck size={18}/><span>Core Assessment</span></div>
-        <Metric label="Written Examination" value={result.written} max={70}/>
-        <Metric label="Viva" value={result.viva} max={30}/>
-        <Metric label="Final Assessment" value={result.finalAssessment} max={100} accent/>
+        <Metric label="Written Examination" value={result.written} max={result.writtenMax}/>
+        {result.vivaEnabled && <Metric label="Viva" value={result.viva} max={30}/>}
+        <Metric label="Percentage" value={result.finalAssessment} max={100} accent/>
       </section>
 
-      <section className="section compact">
+      {result.additionalEnabled && <section className="section compact">
         <div className="sectionTitle"><Sparkles size={18}/><span>Additional Marks</span><b>{Number(result.additional).toFixed(1)}/5</b></div>
         <div className="miniGrid">
           <div><span>Dressing</span><b>{Number(result.dressing).toFixed(1)}/1</b></div>
           <div><span>Delivery</span><b>{Number(result.delivery).toFixed(1)}/2</b></div>
           <div><span>Composure</span><b>{Number(result.composure).toFixed(1)}/2</b></div>
         </div>
-      </section>
+      </section>}
 
       <button className="complaint" onClick={() => window.location.href = `mailto:?subject=Result%20Complaint%20-%20${encodeURIComponent(result.examName)}&body=Please%20review%20my%20result%20for%20${encodeURIComponent(result.examName)}.`}>
         <MessageCircleWarning size={18}/><span>Report a result concern</span><ChevronRight size={18}/>

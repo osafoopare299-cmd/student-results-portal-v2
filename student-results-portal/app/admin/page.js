@@ -37,7 +37,15 @@ export default function AdminPage() {
     setLoading(true); setError(''); setNotice('');
     try {
       const res=await fetch('/api/admin/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      const json=await res.json(); if(!res.ok) throw new Error(json.error); setNotice('Saved successfully.'); await load(); return true;
+      const json=await res.json(); if(!res.ok) throw new Error(json.error);
+      if (payload.action === 'publish_exam' && payload.published) {
+        if (json.emailWarning) setNotice(`Results published, but emails were not sent. ${json.emailWarning}`);
+        else if (json.alreadyPublished) setNotice('This examination was already published. No duplicate emails were sent.');
+        else if (json.emailsFailed) setNotice(`Results published. ${json.emailsSent} email(s) sent; ${json.emailsFailed} failed.`);
+        else setNotice(`Results published and ${json.emailsSent} student email(s) sent successfully.`);
+      } else if (payload.action === 'publish_exam') setNotice('Examination unpublished successfully.');
+      else setNotice('Saved successfully.');
+      await load(); return true;
     } catch(e){setError(e.message);return false} finally{setLoading(false)}
   }
 

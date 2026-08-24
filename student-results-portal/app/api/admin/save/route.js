@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isAdmin } from '../../../../lib/admin-auth';
 import { getSql } from '../../../../lib/db';
+import { sendPublishedResultNotifications } from '../../../../lib/result-notifications';
 
 const n = (value) => Number(value);
 
@@ -18,8 +19,41 @@ export async function POST(request) {
     }
 
     if (body.action === 'publish_exam') {
-      await sql`UPDATE exams SET published=${Boolean(body.published)} WHERE id=${n(body.examId)}`;
-      return NextResponse.json({ ok: true });
+      const examId = n(body.examId);
+      const published = Boolean(body.published);
+      if (!examId) return NextResponse.json({ error: 'A valid examination is required.' }, { status: 400 });
+
+      if (!published) {
+        await sql`UPDATE exams SET published=false WHERE id=${examId}`;
+        return NextResponse.json({ ok: true, published: false });
+      }
+
+      const exams = await sql`
+        UPDATE exams SET published=true
+        WHERE id=${examId} AND published=false
+        RETURNING id, exam_name, subject
+      `;
+      if (!exams.length) {
+        const existing = await sql`SELECT id FROM exams WHERE id=${examId}`;
+        if (!existing.length) return NextResponse.json({ error: 'Examination not found.' }, { status: 404 });
+        return NextResponse.json({ ok: true, published: true, alreadyPublished: true, emailsSent: 0, emailsFailed: 0 });
+      }
+
+      const students = await sql`
+        SELECT DISTINCT s.id, s.email, s.full_name
+        FROM written_results wr
+        JOIN students s ON s.id=wr.student_id
+        WHERE wr.exam_id=${examId} AND s.email IS NOT NULL AND trim(s.email) <> ''
+        ORDER BY s.full_name
+      `;
+      const delivery = await sendPublishedResultNotifications({ exam: exams[0], students });
+      return NextResponse.json({
+        ok: true,
+        published: true,
+        emailsSent: delivery.sent,
+        emailsFailed: delivery.failed,
+        emailWarning: delivery.error || null,
+      });
     }
 
     if (body.action === 'save_result') {

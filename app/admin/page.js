@@ -22,12 +22,14 @@ export default function AdminPage() {
   const [selectedExamId, setSelectedExamId] = useState('');
   const activeExam = data?.exams?.find(x=>String(x.id)===String(selectedExamId)) || data?.exams?.[0] || null;
 
-  async function load() {
-    const res = await fetch('/api/admin/data', {cache:'no-store'});
+  async function load(examId = selectedExamId) {
+    const query = examId ? `?examId=${encodeURIComponent(examId)}` : '';
+    const res = await fetch(`/api/admin/data${query}`, {cache:'no-store'});
     if (res.status === 401) { setAuthed(false); return; }
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || 'Unable to load dashboard');
     setData(json); setAuthed(true);
+    if (json.selectedExamId) setSelectedExamId(String(json.selectedExamId));
   }
 
   useEffect(() => { load().catch(()=>{}); }, []);
@@ -107,7 +109,7 @@ export default function AdminPage() {
       <div><Users/><span>Students</span><b>{data?.stats?.students ?? 0}</b></div><div><BookOpen/><span>Exams</span><b>{data?.stats?.exams ?? 0}</b></div><div><CheckCircle2/><span>Complete</span><b>{data?.stats?.complete ?? 0}</b></div><div><BarChart3/><span>Published</span><b>{data?.stats?.published ?? 0}</b></div>
     </section>
 
-    <section className="adminCard"><div className="adminCardHead"><div><span className="eyebrow">WORKSPACE</span><h2>Working examination</h2></div><BookOpen size={20}/></div><div className="formGrid"><label>Select examination<select value={activeExam?.id || ''} onChange={e=>{setSelectedExamId(e.target.value);setResult(emptyResult)}}><option value="">Select exam</option>{data?.exams?.map(x=><option key={x.id} value={x.id}>{x.exam_name}{x.published?' — Published':' — Unpublished'}</option>)}</select></label></div></section>
+    <section className="adminCard"><div className="adminCardHead"><div><span className="eyebrow">WORKSPACE</span><h2>Working examination</h2></div><BookOpen size={20}/></div><div className="formGrid"><label>Select examination<select value={activeExam?.id || ''} onChange={async e=>{const examId=e.target.value;setSelectedExamId(examId);setResult(emptyResult);await load(examId)}}><option value="">Select exam</option>{data?.exams?.map(x=><option key={x.id} value={x.id}>{x.exam_name}{x.published?' — Published':' — Unpublished'}</option>)}</select></label></div></section>
 
     <section className="adminCard"><div className="adminCardHead"><div><span className="eyebrow">STEP 1</span><h2>Import Microsoft Forms results</h2></div><FileSpreadsheet size={20}/></div><p className="muted">Set the written maximum and select only the components used. The final result will be converted to a percentage.</p><div className="formGrid"><label>Import destination<select value={importMode} onChange={e=>setImportMode(e.target.value)}><option value="existing">Update selected examination</option><option value="new">Import as a new examination</option></select></label>{importMode==='new'&&<label>New examination name<input value={newExamName} onChange={e=>setNewExamName(e.target.value)} placeholder="e.g. Second Rotation Examination"/></label>}<label>Written examination maximum<input type="number" min="1" step="0.01" value={writtenMax} onChange={e=>setWrittenMax(e.target.value)}/></label><label className="checkLabel"><input type="checkbox" checked={vivaEnabled} onChange={e=>setVivaEnabled(e.target.checked)}/> Include viva marks (/30)</label><label className="checkLabel"><input type="checkbox" checked={additionalEnabled} onChange={e=>setAdditionalEnabled(e.target.checked)}/> Include additional marks (/5)</label><label>Microsoft Forms Excel file<input id="excel-import" type="file" accept=".xlsx,.xls" onChange={e=>setImportFile(e.target.files?.[0]||null)}/></label></div><div className="examActions"><button className="adminAction" disabled={loading||!activeExam?.id||!writtenMax} onClick={()=>save({action:'update_exam_settings',examId:activeExam.id,writtenMax,vivaEnabled,additionalEnabled})}><Save size={17}/> Save examination settings</button><button className="adminAction" disabled={loading||!importFile||!writtenMax||(importMode==='existing'&&!activeExam?.id)||(importMode==='new'&&!newExamName.trim())} onClick={importExcel}>{loading?<><LoaderCircle className="spin" size={17}/> Importing…</>:<><Upload size={17}/> Import into Neon</>}</button></div></section>
 

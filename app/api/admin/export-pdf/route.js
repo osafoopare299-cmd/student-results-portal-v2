@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+// Administrator-only PDF export endpoint.
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { isAdmin } from '../../../../lib/admin-auth';
 import { getSql } from '../../../../lib/db';

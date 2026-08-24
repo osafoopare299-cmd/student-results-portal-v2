@@ -17,10 +17,5 @@ Mobile-first Next.js portal for DR. OPARE's academic results workflow.
 ## Required server environment variables
 - `DATABASE_URL` — Neon PostgreSQL pooled connection string
 - `ADMIN_PASSWORD` — long unique administrator password
-- `RESEND_API_KEY` — Resend server API key used for publication notifications
-- `RESEND_FROM_EMAIL` — verified sender, for example `Academic Results <results@yourdomain.com>`
-- `APP_URL` — public student portal URL included in notification emails
 
-Never expose `DATABASE_URL`, `ADMIN_PASSWORD`, or `RESEND_API_KEY` with a `NEXT_PUBLIC_` prefix.
-
-When an examination changes from unpublished to published, each student with a written result for that examination receives one email. Repeated publish requests do not send duplicates.
+Never prefix either variable with `NEXT_PUBLIC_`.

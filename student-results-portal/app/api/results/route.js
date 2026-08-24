@@ -31,21 +31,25 @@ export async function POST(request) {
     }
 
     const results = rows.map((r) => {
-      const finalAssessment = Number(r.final_assessment_100 || 0);
+      const finalAssessment = Number(r.overall_percentage || 0);
       return {
         fullName: r.full_name,
         email: r.email,
         examName: r.exam_name,
         subject: r.subject || '',
         examDate: r.exam_date || null,
-        written: Number(r.written_weighted || 0),
+        written: Number(r.written_raw || 0),
+        writtenMax: Number(r.written_max || 0),
+        vivaEnabled: Boolean(r.viva_enabled),
+        additionalEnabled: Boolean(r.additional_enabled),
         viva: Number(r.viva_total || 0),
         finalAssessment,
         dressing: Number(r.dressing || 0),
         delivery: Number(r.delivery || 0),
         composure: Number(r.composure || 0),
         additional: Number(r.additional_total || 0),
-        overall: Number(r.overall_score_105 || 0),
+        overall: Number(r.total_score || 0),
+        overallMax: Number(r.total_max || 0),
         overallPercent: Number(r.overall_percentage || 0),
         grade: grade(finalAssessment),
         status: finalAssessment >= 50 ? 'PASS' : 'FAIL',

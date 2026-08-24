@@ -46,6 +46,28 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, emailsSent: delivery.sent, emailsFailed: delivery.failed });
     }
 
+    if (body.action === 'send_result_alerts') {
+      const examId = n(body.examId);
+      if (!examId) return NextResponse.json({ error: 'Select an examination.' }, { status: 400 });
+      if (!resultEmailIsConfigured()) return NextResponse.json({ error: 'Result email alerts are not configured yet.' }, { status: 503 });
+      const [exam] = await sql`SELECT id, exam_name FROM exams WHERE id=${examId} AND published=true AND archived=false`;
+      if (!exam) return NextResponse.json({ error: 'Publish this examination before sending alerts.' }, { status: 400 });
+      const students = await sql`
+        SELECT DISTINCT s.id, s.email, s.full_name
+        FROM written_results wr
+        JOIN students s ON s.id=wr.student_id
+        WHERE wr.exam_id=${examId} AND trim(s.email) <> ''
+        ORDER BY s.full_name
+      `;
+      if (!students.length) return NextResponse.json({ error: 'No participant email addresses were found for this examination.' }, { status: 400 });
+      const alertId = String(body.alertId || Date.now()).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+      console.log('Sending result alerts', { examId, recipients: students.length, alertId });
+      const delivery = await sendResultPublishedEmails({ exam, students, alertId });
+      console.log('Result alerts completed', { examId, ...delivery });
+      if (!delivery.sent) return NextResponse.json({ error: `Email delivery failed for all ${delivery.failed} participants. Check the Resend API key and domain.` }, { status: 502 });
+      return NextResponse.json({ ok: true, emailsSent: delivery.sent, emailsFailed: delivery.failed });
+    }
+
     if (body.action === 'update_exam_settings') {
       const examId = n(body.examId);
       const writtenMax = n(body.writtenMax);

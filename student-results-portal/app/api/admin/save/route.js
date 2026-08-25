@@ -26,24 +26,13 @@ export async function POST(request) {
         await sql`UPDATE exams SET published=false WHERE id=${examId}`;
         return NextResponse.json({ ok: true });
       }
-      if (!resultEmailIsConfigured()) {
-        return NextResponse.json({ error: 'Result email alerts are not configured yet.' }, { status: 503 });
-      }
       const exams = await sql`
         UPDATE exams SET published=true
         WHERE id=${examId} AND published=false AND archived=false
         RETURNING id, exam_name
       `;
       if (!exams.length) return NextResponse.json({ ok: true, alreadyPublished: true });
-      const students = await sql`
-        SELECT DISTINCT s.id, s.email, s.full_name
-        FROM written_results wr
-        JOIN students s ON s.id=wr.student_id
-        WHERE wr.exam_id=${examId} AND trim(s.email) <> ''
-        ORDER BY s.full_name
-      `;
-      const delivery = await sendResultPublishedEmails({ exam: exams[0], students });
-      return NextResponse.json({ ok: true, emailsSent: delivery.sent, emailsFailed: delivery.failed });
+      return NextResponse.json({ ok: true, published: true, sendEmailAlerts: true });
     }
 
     if (body.action === 'send_result_alerts') {

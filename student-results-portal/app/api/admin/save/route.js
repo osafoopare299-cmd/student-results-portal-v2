@@ -62,10 +62,34 @@ export async function POST(request) {
       if (!students.length) return NextResponse.json({ error: 'No participant email addresses were found for this examination.' }, { status: 400 });
       const alertId = String(body.alertId || Date.now()).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
       console.log('Sending result alerts', { examId, recipients: students.length, alertId });
-      const delivery = await sendResultPublishedEmails({ exam, students, alertId });
-      console.log('Result alerts completed', { examId, ...delivery });
-      if (!delivery.sent) return NextResponse.json({ error: `Email delivery failed for all ${delivery.failed} participants. Check the Resend API key and domain.` }, { status: 502 });
-      return NextResponse.json({ ok: true, emailsSent: delivery.sent, emailsFailed: delivery.failed });
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          const update = (payload) => controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
+          try {
+            update({ type: 'progress', sent: 0, failed: 0, processed: 0, total: students.length });
+            const delivery = await sendResultPublishedEmails({
+              exam,
+              students,
+              alertId,
+              onProgress: (progress) => update({ type: 'progress', ...progress }),
+            });
+            console.log('Result alerts completed', { examId, ...delivery });
+            update({ type: 'complete', emailsSent: delivery.sent, emailsFailed: delivery.failed, total: students.length });
+          } catch (error) {
+            console.error('Result alert stream failed', { examId, error });
+            update({ type: 'error', error: 'Email delivery stopped unexpectedly.' });
+          } finally {
+            controller.close();
+          }
+        },
+      });
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'application/x-ndjson; charset=utf-8',
+          'Cache-Control': 'no-cache, no-transform',
+        },
+      });
     }
 
     if (body.action === 'update_exam_settings') {

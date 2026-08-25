@@ -16,7 +16,7 @@ export function resultEmailIsConfigured() {
   return emailConfig().ready;
 }
 
-const BATCH_SIZE = 5;
+const BATCH_SIZE = 8;
 const BATCH_DELAY_MS = 1100;
 const MAX_RATE_LIMIT_RETRIES = 3;
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -70,7 +70,7 @@ async function sendParticipantEmail({ apiKey, from, appUrl, exam, student, alert
   }
 }
 
-export async function sendResultPublishedEmails({ exam, students, alertId = 'published' }) {
+export async function sendResultPublishedEmails({ exam, students, alertId = 'published', onProgress }) {
   const { apiKey, from, appUrl } = emailConfig();
   const results = [];
 
@@ -80,6 +80,8 @@ export async function sendResultPublishedEmails({ exam, students, alertId = 'pub
       sendParticipantEmail({ apiKey, from, appUrl, exam, student, alertId })
     ));
     results.push(...batchResults);
+    const sent = results.filter((result) => result.status === 'fulfilled').length;
+    if (onProgress) await onProgress({ sent, failed: results.length - sent, processed: results.length, total: students.length });
     if (index + BATCH_SIZE < students.length) await wait(BATCH_DELAY_MS);
   }
 

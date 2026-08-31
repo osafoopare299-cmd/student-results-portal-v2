@@ -22,17 +22,26 @@ async function status(sql){
   return {foundation:Boolean(s.users&&s.courses&&s.offerings&&s.enrolments),materials:Boolean(s.materials)};
 }
 
+function setupState(databaseStatus){
+  return {
+    ok:true,
+    configured:Boolean(process.env.EDUCATION_DATABASE_URL),
+    isolated:educationDatabaseIsIsolated(),
+    status:databaseStatus,
+  };
+}
+
 export async function GET(){
   const denied=await guard(); if(denied) return denied;
   if(!process.env.EDUCATION_DATABASE_URL) return NextResponse.json({ok:true,configured:false,isolated:false,status:{foundation:false,materials:false}});
-  if(!educationDatabaseIsIsolated()) return NextResponse.json({ok:false,error:'Education database must be isolated from the results database.'},{status:409});
-  try{const sql=getEducationSql();return NextResponse.json({ok:true,configured:true,isolated:true,status:await status(sql)});}catch(error){console.error('Education setup status failed:',error);return NextResponse.json({ok:false,error:'Unable to connect to the education database.'},{status:503});}
+  if(!educationDatabaseIsIsolated()) return NextResponse.json({ok:false,configured:true,isolated:false,error:'Education database must be isolated from the results database.',status:{foundation:false,materials:false}},{status:409});
+  try{const sql=getEducationSql();return NextResponse.json(setupState(await status(sql)));}catch(error){console.error('Education setup status failed:',error);return NextResponse.json({ok:false,configured:true,isolated:true,error:'Unable to connect to the education database.'},{status:503});}
 }
 
 export async function POST(){
   const denied=await guard(); if(denied) return denied;
-  if(!process.env.EDUCATION_DATABASE_URL) return NextResponse.json({ok:false,error:'EDUCATION_DATABASE_URL is not configured.'},{status:503});
-  if(!educationDatabaseIsIsolated()) return NextResponse.json({ok:false,error:'Refusing setup because the education database is not isolated from the results database.'},{status:409});
+  if(!process.env.EDUCATION_DATABASE_URL) return NextResponse.json({ok:false,configured:false,isolated:false,error:'EDUCATION_DATABASE_URL is not configured.'},{status:503});
+  if(!educationDatabaseIsIsolated()) return NextResponse.json({ok:false,configured:true,isolated:false,error:'Refusing setup because the education database is not isolated from the results database.'},{status:409});
   try{
     const sql=getEducationSql();
     await sql`create table if not exists edu_academic_years (id bigserial primary key,name text not null unique,starts_on date,ends_on date,is_active boolean not null default false,created_at timestamptz not null default now())`;
@@ -59,6 +68,6 @@ export async function POST(){
     await sql`create table if not exists edu_learning_materials (id bigserial primary key,offering_id bigint not null references edu_course_offerings(id) on delete cascade,created_by bigint not null references edu_users(id),title text not null,description text,material_type text not null default 'note' check (material_type in ('note','pdf','video','link')),resource_url text,content_text text,is_offline_available boolean not null default false,is_ai_approved boolean not null default false,published_at timestamptz,created_at timestamptz not null default now(),updated_at timestamptz not null default now())`;
     await sql`create index if not exists edu_learning_materials_offering_idx on edu_learning_materials(offering_id,published_at desc)`;
     await sql`create index if not exists edu_learning_materials_ai_idx on edu_learning_materials(offering_id,is_ai_approved) where published_at is not null`;
-    return NextResponse.json({ok:true,status:await status(sql)});
-  }catch(error){console.error('Education setup failed:',error);return NextResponse.json({ok:false,error:'Education database setup failed. No production database changes were attempted.'},{status:503});}
+    return NextResponse.json(setupState(await status(sql)));
+  }catch(error){console.error('Education setup failed:',error);return NextResponse.json({ok:false,configured:true,isolated:true,error:'Education database setup failed. No production database changes were attempted.'},{status:503});}
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isAdmin } from '../../../../../lib/admin-auth';
-import { getSql } from '../../../../../lib/db';
+import { getEducationSql } from '../../../../../lib/db';
 
 export const dynamic='force-dynamic';
 
@@ -12,7 +12,7 @@ async function guard(){
 export async function GET(){
   const denied=await guard(); if(denied) return denied;
   try{
-    const sql=getSql();
+    const sql=getEducationSql();
     const [courses,classes,years,lecturers,offerings]=await Promise.all([
       sql`select id,code,title from edu_courses where active=true order by code`,
       sql`select id,name,code,level,academic_year_id from edu_classes order by name`,
@@ -26,7 +26,7 @@ export async function GET(){
           join edu_classes cl on cl.id=o.class_id
           join edu_academic_years y on y.id=o.academic_year_id
           left join edu_users u on u.id=o.lecturer_user_id
-          order by y.name desc,c.code,cl.name,o.term nulls first`
+          order by y.name desc,c.code,cl.name,o.term`
     ]);
     return NextResponse.json({ok:true,courses,classes,years,lecturers,offerings});
   }catch(error){
@@ -40,9 +40,12 @@ export async function POST(request){
   try{
     const body=await request.json();
     const courseId=body.courseId||null,classId=body.classId||null,academicYearId=body.academicYearId||null;
-    const lecturerId=body.lecturerId||null,term=String(body.term||'').trim()||null;
-    if(!courseId||!classId||!academicYearId) return NextResponse.json({ok:false,error:'Course, class and academic year are required.'},{status:400});
-    const sql=getSql();
+    const lecturerId=body.lecturerId||null,term=String(body.term||'').trim();
+    if(!courseId||!classId||!academicYearId||!term) return NextResponse.json({ok:false,error:'Course, class, academic year and term are required.'},{status:400});
+    const sql=getEducationSql();
+    const classRows=await sql`select academic_year_id from edu_classes where id=${classId} limit 1`;
+    if(!classRows?.[0]) return NextResponse.json({ok:false,error:'Selected class was not found.'},{status:404});
+    if(String(classRows[0].academic_year_id)!==String(academicYearId)) return NextResponse.json({ok:false,error:'The selected class belongs to a different academic year.'},{status:400});
     const rows=await sql`
       insert into edu_course_offerings (course_id,class_id,academic_year_id,lecturer_user_id,term)
       values (${courseId},${classId},${academicYearId},${lecturerId},${term})

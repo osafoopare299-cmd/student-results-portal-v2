@@ -7,7 +7,13 @@ export function getSql() {
 }
 
 export function getEducationSql() {
-  const url = process.env.EDUCATION_DATABASE_URL || process.env.DATABASE_URL;
-  if (!url) throw new Error('EDUCATION_DATABASE_URL or DATABASE_URL is not configured');
+  const url = process.env.EDUCATION_DATABASE_URL;
+  if (!url) throw new Error('EDUCATION_DATABASE_URL is not configured');
   return neon(url);
+}
+
+export function educationDatabaseIsIsolated() {
+  const educationUrl = process.env.EDUCATION_DATABASE_URL;
+  const resultsUrl = process.env.DATABASE_URL;
+  return Boolean(educationUrl && (!resultsUrl || educationUrl !== resultsUrl));
 }

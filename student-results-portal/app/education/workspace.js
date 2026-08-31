@@ -43,8 +43,8 @@ const workspaces = {
     welcome: 'Control the academic structure, permissions and platform health.',
     stats: [['Students','—'],['Lecturers','—'],['Courses','—'],['Academic year','—']],
     actions: [
-      ['People & Permissions','Students, lecturers, roles and access scopes',UserCog,null],
-      ['Courses & Classes','Courses, classes, rotations and enrolments',GraduationCap,null],
+      ['People & Permissions','Students, lecturers, roles and access scopes',UserCog,'/education/admin/people'],
+      ['Courses & Classes','Courses, classes, rotations and enrolments',GraduationCap,'/education/admin/catalog'],
       ['Academic Years','Terms, years, grading rules and publication policies',CalendarDays,null],
       ['Assessment Control','Templates, moderation and publication workflows',ClipboardCheck,null],
       ['Notifications','Result, assignment and announcement delivery settings',Bell,null],

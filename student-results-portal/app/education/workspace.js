@@ -17,7 +17,7 @@ const workspaces = {
     stats: [['Courses','6'],['Attendance','92%'],['Assessments due','3'],['Average','78.4%']],
     actions: [
       ['Learning Hub','Notes, PDFs, videos and saved offline resources',BookOpen,'/education/student/learn'],
-      ['Assessments','MCQs, written tests, viva/OSCE and practicals',ClipboardCheck,null],
+      ['Assessments','MCQs, written tests, viva/OSCE and practicals',ClipboardCheck,'/education/student/assess'],
       ['Results','Grades, percentages, class position and trends',BarChart3,'/'],
       ['Timetable','Classes, rotations, assessments and deadlines',CalendarDays,null],
       ['AI Tutor','Answers grounded only in approved course materials',Sparkles,null],
@@ -30,7 +30,7 @@ const workspaces = {
     stats: [['Courses','4'],['Students','168'],['Draft results','2'],['Pending marking','19']],
     actions: [
       ['Course Materials','Upload notes, PDFs, videos and learning resources',FileText,'/education/lecturer/learning'],
-      ['Create Assessment','Build MCQ, written, viva/OSCE and practical assessments',ClipboardCheck,null],
+      ['Create Assessment','Build MCQ, written, viva/OSCE and practical assessments',ClipboardCheck,'/education/lecturer/assessments'],
       ['Marks & Results','Enter marks, review calculations and publish results',BarChart3,'/admin'],
       ['Attendance','Create sessions and record attendance',CheckCircle2,null],
       ['Announcements','Send course and class updates',MessageSquareText,null],
@@ -63,6 +63,7 @@ export default function Workspace({ role }) {
   const [menuOpen,setMenuOpen]=useState(false);
   const data=workspaces[role] || workspaces.student;
   const learnHref=role==='lecturer'?'/education/lecturer/learning':role==='student'?'/education/student/learn':null;
+  const assessHref=role==='lecturer'?'/education/lecturer/assessments':role==='student'?'/education/student/assess':null;
   return <main className={styles.shell}>
     <aside className={`${styles.sidebar} ${menuOpen ? styles.sidebarOpen : ''}`}>
       <div className={styles.brand}><span><Stethoscope size={22}/></span><div><b>Dropare Education</b><small>{data.label} workspace</small></div></div>
@@ -70,7 +71,7 @@ export default function Workspace({ role }) {
       <nav>
         <Link className={styles.active} href={`/education/${role}`}><LayoutDashboard size={18}/> Dashboard</Link>
         {learnHref ? <Link href={learnHref}><BookOpen size={18}/> Learning</Link> : <a><BookOpen size={18}/> Learning</a>}
-        <a><ClipboardCheck size={18}/> Assessments</a>
+        {assessHref ? <Link href={assessHref}><ClipboardCheck size={18}/> Assessments</Link> : <a><ClipboardCheck size={18}/> Assessments</a>}
         {role==='student'?<Link href="/"><BarChart3 size={18}/> Results</Link>:role==='lecturer'?<Link href="/admin"><BarChart3 size={18}/> Results</Link>:<a><BarChart3 size={18}/> Results</a>}
         <a><CalendarDays size={18}/> Timetable</a><a><Bell size={18}/> Notifications</a>
       </nav>
@@ -89,7 +90,7 @@ export default function Workspace({ role }) {
         <section className={styles.featureGrid}>{data.actions.map(item=><ToolCard key={item[0]} item={item}/>)}</section>
         <section className={styles.foundation}><ShieldCheck size={20}/><div><b>Authentication boundary prepared</b><p>This workspace now has its own route. Database-backed authorization will replace preview metrics with the signed-in user's courses, classes, results and permissions without changing the existing results workflow.</p></div></section>
       </div>
-      {role==='student' && <nav className={styles.mobileNav}><Link className={styles.active} href="/education/student"><LayoutDashboard/><span>Home</span></Link><Link href="/education/student/learn"><BookOpen/><span>Learn</span></Link><a><ClipboardCheck/><span>Assess</span></a><Link href="/"><BarChart3/><span>Results</span></Link><a><Users/><span>More</span></a></nav>}
+      {role==='student' && <nav className={styles.mobileNav}><Link className={styles.active} href="/education/student"><LayoutDashboard/><span>Home</span></Link><Link href="/education/student/learn"><BookOpen/><span>Learn</span></Link><Link href="/education/student/assess"><ClipboardCheck/><span>Assess</span></Link><Link href="/"><BarChart3/><span>Results</span></Link><a><Users/><span>More</span></a></nav>}
     </section>
   </main>;
 }

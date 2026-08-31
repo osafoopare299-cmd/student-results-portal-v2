@@ -1,10 +1,12 @@
-import LearningHub from '../../learning-hub';
+import StudentMaterials from './student-materials';
 
 export const metadata = {
   title: 'Learning Hub | Dropare Education',
-  description: 'Student courses, approved learning materials, assignments and offline study resources.',
+  description: 'Published course materials for the signed-in student’s active enrolments.',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default function StudentLearningPage() {
-  return <LearningHub mode="student"/>;
+  return <StudentMaterials/>;
 }

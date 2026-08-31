@@ -20,6 +20,7 @@ const workspaces = {
       ['Assessments','MCQs, written tests, viva/OSCE and practicals',ClipboardCheck,'/education/student/assess'],
       ['Results','Published grades, percentages and assessment breakdowns',BarChart3,'/education/student/results'],
       ['Timetable','Classes, rotations, assessments and deadlines',CalendarDays,'/education/student/timetable'],
+      ['AI Tutor','Ask questions from approved course materials only',Sparkles,'/education/student/ai-tutor'],
       ['Notifications','Results, assignments, timetable and learning updates',Bell,'/education/student/notifications'],
       ['Attendance','Class and rotation attendance summaries',CheckCircle2,'/education/student/attendance'],
     ],

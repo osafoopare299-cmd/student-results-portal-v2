@@ -1,9 +1,18 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Student Results Portal',
-  description: 'Secure mobile-first student results portal',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
+  title: {
+    default: 'Dropare Student Education System',
+    template: '%s | Dropare Education',
+  },
+  description: 'Mobile-first learning, assessment and academic progress platform.',
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }) {

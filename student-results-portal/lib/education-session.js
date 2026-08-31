@@ -1,6 +1,7 @@
 import { getEducationAuth, educationAuthConfigured } from './education-auth';
 import { getEducationSql } from './db';
 
+// Server-side role resolution for authenticated education workspaces.
 export async function getEducationUser(expectedRole) {
   if (!educationAuthConfigured()) return { ok: false, reason: 'setup' };
   try {

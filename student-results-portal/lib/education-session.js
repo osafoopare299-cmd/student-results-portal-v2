@@ -5,7 +5,7 @@ export async function getEducationUser(expectedRole) {
   if (!educationAuthConfigured()) return { ok: false, reason: 'setup' };
   try {
     const auth = getEducationAuth();
-    const session = await auth.getSession();
+    const { data: session } = await auth.getSession();
     const email = session?.user?.email;
     if (!email) return { ok: false, reason: 'unauthenticated' };
     const sql = getEducationSql();

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getEducationUser } from '../../../../../lib/education-session';
-import { getSql } from '../../../../../lib/db';
+import { getEducationSql } from '../../../../../lib/db';
 
 export const dynamic='force-dynamic';
 
@@ -8,7 +8,7 @@ export async function GET(){
   const access=await getEducationUser('student');
   if(!access.ok) return NextResponse.json({ok:false,error:'Student access required.'},{status:401});
   try{
-    const sql=getSql();
+    const sql=getEducationSql();
     const offerings=await sql`
       select o.id,c.code,c.title,cl.name as class_name,y.name as academic_year,o.term,
              u.full_name as lecturer_name,

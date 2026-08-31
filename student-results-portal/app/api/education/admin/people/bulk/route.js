@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isAdmin } from '../../../../../../lib/admin-auth';
-import { getSql } from '../../../../../../lib/db';
+import { getEducationSql } from '../../../../../../lib/db';
 
 export const dynamic='force-dynamic';
 const clean=(v,max=180)=>String(v||'').trim().slice(0,max);
@@ -13,7 +13,7 @@ export async function POST(request){
   const classId=body.classId||null;
   if(!rows.length) return NextResponse.json({ok:false,error:'No student records were supplied.'},{status:400});
   if(rows.length>1000) return NextResponse.json({ok:false,error:'Import a maximum of 1,000 students at a time.'},{status:400});
-  const sql=getSql(); let saved=0,skipped=0; const errors=[];
+  const sql=getEducationSql(); let saved=0,skipped=0; const errors=[];
   for(let i=0;i<rows.length;i++){
    const item=rows[i]||{}; const fullName=clean(item.fullName||item.full_name||item.name); const email=clean(item.email).toLowerCase(); const studentNumber=clean(item.studentNumber||item.student_number,80)||null;
    if(!fullName||!email||!email.includes('@')){skipped++;errors.push(`Row ${i+1}: name or email is invalid.`);continue;}

@@ -20,7 +20,7 @@ const workspaces = {
       ['Assessments','MCQs, written tests, viva/OSCE and practicals',ClipboardCheck,'/education/student/assess'],
       ['Results','Published grades, percentages and assessment breakdowns',BarChart3,'/education/student/results'],
       ['Timetable','Classes, rotations, assessments and deadlines',CalendarDays,'/education/student/timetable'],
-      ['AI Tutor','Answers grounded only in approved course materials',Sparkles,null],
+      ['Notifications','Results, assignments, timetable and learning updates',Bell,'/education/student/notifications'],
       ['Attendance','Class and rotation attendance summaries',CheckCircle2,'/education/student/attendance'],
     ],
   },
@@ -33,7 +33,7 @@ const workspaces = {
       ['Create Assessment','Build MCQ, written, viva/OSCE and practical assessments',ClipboardCheck,'/education/lecturer/assessments'],
       ['Marks & Results','Enter marks, review calculations and publish results',BarChart3,'/admin'],
       ['Attendance','Create sessions and record attendance',CheckCircle2,'/education/lecturer/attendance'],
-      ['Announcements','Send course and class updates',MessageSquareText,null],
+      ['Announcements','Create class updates and review notification activity',MessageSquareText,'/education/lecturer/notifications'],
       ['Class Analytics','Weak topics, progress and assessment performance',Activity,null],
     ],
   },
@@ -66,6 +66,7 @@ export default function Workspace({ role }) {
   const assessHref=role==='lecturer'?'/education/lecturer/assessments':role==='student'?'/education/student/assess':null;
   const timetableHref=role==='lecturer'?'/education/lecturer/timetable':role==='student'?'/education/student/timetable':null;
   const resultsHref=role==='student'?'/education/student/results':role==='lecturer'?'/admin':null;
+  const notificationsHref=role==='lecturer'?'/education/lecturer/notifications':role==='student'?'/education/student/notifications':null;
   return <main className={styles.shell}>
     <aside className={`${styles.sidebar} ${menuOpen ? styles.sidebarOpen : ''}`}>
       <div className={styles.brand}><span><Stethoscope size={22}/></span><div><b>Dropare Education</b><small>{data.label} workspace</small></div></div>
@@ -76,7 +77,7 @@ export default function Workspace({ role }) {
         {assessHref ? <Link href={assessHref}><ClipboardCheck size={18}/> Assessments</Link> : <a><ClipboardCheck size={18}/> Assessments</a>}
         {resultsHref ? <Link href={resultsHref}><BarChart3 size={18}/> Results</Link> : <a><BarChart3 size={18}/> Results</a>}
         {timetableHref ? <Link href={timetableHref}><CalendarDays size={18}/> Timetable</Link> : <a><CalendarDays size={18}/> Timetable</a>}
-        <a><Bell size={18}/> Notifications</a>
+        {notificationsHref ? <Link href={notificationsHref}><Bell size={18}/> Notifications</Link> : <a><Bell size={18}/> Notifications</a>}
       </nav>
       <div className={styles.sidebarFoot}><ShieldCheck size={18}/><span>Access will be enforced by authenticated role</span></div>
     </aside>
@@ -93,7 +94,7 @@ export default function Workspace({ role }) {
         <section className={styles.featureGrid}>{data.actions.map(item=><ToolCard key={item[0]} item={item}/>)}</section>
         <section className={styles.foundation}><ShieldCheck size={20}/><div><b>Authentication boundary prepared</b><p>This workspace now has its own route. Database-backed authorization will replace preview metrics with the signed-in user's courses, classes, results and permissions without changing the existing results workflow.</p></div></section>
       </div>
-      {role==='student' && <nav className={styles.mobileNav}><Link className={styles.active} href="/education/student"><LayoutDashboard/><span>Home</span></Link><Link href="/education/student/learn"><BookOpen/><span>Learn</span></Link><Link href="/education/student/assess"><ClipboardCheck/><span>Assess</span></Link><Link href="/education/student/results"><BarChart3/><span>Results</span></Link><Link href="/education/student/timetable"><CalendarDays/><span>More</span></Link></nav>}
+      {role==='student' && <nav className={styles.mobileNav}><Link className={styles.active} href="/education/student"><LayoutDashboard/><span>Home</span></Link><Link href="/education/student/learn"><BookOpen/><span>Learn</span></Link><Link href="/education/student/assess"><ClipboardCheck/><span>Assess</span></Link><Link href="/education/student/results"><BarChart3/><span>Results</span></Link><Link href="/education/student/notifications"><Bell/><span>More</span></Link></nav>}
     </section>
   </main>;
 }

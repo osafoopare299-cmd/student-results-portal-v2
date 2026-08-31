@@ -41,7 +41,7 @@ const workspaces = {
   admin: {
     label: 'Administrator',
     welcome: 'Control the academic structure, permissions and platform health.',
-    stats: [['Students','540'],['Lecturers','32'],['Courses','24'],['Academic year','2026/27']],
+    stats: [['Students','—'],['Lecturers','—'],['Courses','—'],['Academic year','—']],
     actions: [
       ['People & Permissions','Students, lecturers, roles and access scopes',UserCog,null],
       ['Courses & Classes','Courses, classes, rotations and enrolments',GraduationCap,null],
@@ -64,7 +64,7 @@ export default function Workspace({ role, user=null, dashboard=null }) {
   const [menuOpen,setMenuOpen]=useState(false);
   const data=workspaces[role] || workspaces.student;
   const stats=dashboard?.stats || data.stats;
-  const academicYear=dashboard?.academicYear || (role==='admin' ? '2026 / 2027' : 'Not assigned');
+  const academicYear=dashboard?.academicYear || 'Not assigned';
   const learnHref=role==='lecturer'?'/education/lecturer/learning':role==='student'?'/education/student/learn':null;
   const assessHref=role==='lecturer'?'/education/lecturer/assessments':role==='student'?'/education/student/assess':null;
   const timetableHref=role==='lecturer'?'/education/lecturer/timetable':role==='student'?'/education/student/timetable':null;
@@ -88,14 +88,14 @@ export default function Workspace({ role, user=null, dashboard=null }) {
       <header className={styles.topbar}>
         <button className={styles.menuBtn} onClick={()=>setMenuOpen(true)} aria-label="Open navigation"><Menu size={20}/></button>
         <div className={styles.roleTabs}><Link href="/education/student">Student</Link><Link href="/education/lecturer">Lecturer</Link><Link href="/education/admin">Administrator</Link></div>
-        <span className={styles.online}><Wifi size={17}/><span>{user ? 'Connected' : 'Preview'}</span></span>
+        <span className={styles.online}><Wifi size={17}/><span>{dashboard ? 'Connected' : 'Preview'}</span></span>
       </header>
       <div className={styles.inner}>
         <section className={styles.hero}><div><span className={styles.eyebrow}>DROPARE STUDENT EDUCATION SYSTEM</span><h1>{user?.full_name ? `Welcome, ${user.full_name}` : `${data.label} Portal`}</h1><p>{data.welcome}</p></div><div className={styles.heroBadge}><GraduationCap size={28}/><span>Academic Year</span><b>{academicYear}</b></div></section>
         <section className={styles.stats}>{stats.map(([label,value])=><article key={label}><span>{label}</span><strong>{value}</strong></article>)}</section>
         <section className={styles.sectionHead}><div><span className={styles.eyebrow}>WORKSPACE</span><h2>{data.label} tools</h2></div><span className={styles.status}><CheckCircle2 size={16}/> {dashboard ? 'Live data' : 'Route ready'}</span></section>
         <section className={styles.featureGrid}>{data.actions.map(item=><ToolCard key={item[0]} item={item}/>)}</section>
-        <section className={styles.foundation}><ShieldCheck size={20}/><div><b>{dashboard ? 'Database-backed workspace' : 'Secure education foundation'}</b><p>{dashboard ? 'Dashboard totals are now loaded from the signed-in user’s education records. Existing student results publication remains separate and unchanged.' : 'Role access is protected. Live academic data will appear once the education database and authentication environment are activated.'}</p></div></section>
+        <section className={styles.foundation}><ShieldCheck size={20}/><div><b>{dashboard ? 'Database-backed workspace' : 'Secure education foundation'}</b><p>{dashboard ? 'Dashboard totals are now loaded from education records. Existing student results publication remains separate and unchanged.' : 'Role access is protected. Live academic data will appear once the education database and authentication environment are activated.'}</p></div></section>
       </div>
       {role==='student' && <nav className={styles.mobileNav}><Link className={styles.active} href="/education/student"><LayoutDashboard/><span>Home</span></Link><Link href="/education/student/learn"><BookOpen/><span>Learn</span></Link><Link href="/education/student/assess"><ClipboardCheck/><span>Assess</span></Link><Link href="/education/student/results"><BarChart3/><span>Results</span></Link><Link href="/education/student/notifications"><Bell/><span>More</span></Link></nav>}
     </section>

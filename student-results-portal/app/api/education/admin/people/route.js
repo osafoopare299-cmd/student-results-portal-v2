@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { isAdmin } from '../../../../../lib/admin-auth';
-import { getSql } from '../../../../../lib/db';
+import { getEducationSql } from '../../../../../lib/db';
 
 function clean(value, max=180) { return String(value || '').trim().slice(0, max); }
 
 export async function GET() {
   if (!(await isAdmin())) return NextResponse.json({ok:false,error:'Administrator sign-in required.'},{status:401});
   try {
-    const sql = getSql();
+    const sql = getEducationSql();
     const rows = await sql`
       select u.id, u.full_name, u.email, u.role, u.status,
              sp.student_number, sp.class_id, c.name as class_name,
@@ -36,7 +36,7 @@ export async function POST(request) {
     const role = clean(body.role,20);
     const status = clean(body.status || 'active',20);
     if (!fullName || !email || !['student','lecturer','admin'].includes(role) || !['active','inactive','suspended'].includes(status)) return NextResponse.json({ok:false,error:'Please provide a valid name, email, role and status.'},{status:400});
-    const sql = getSql();
+    const sql = getEducationSql();
     const rows = await sql`insert into edu_users (full_name,email,role,status) values (${fullName},${email},${role},${status}) on conflict ((lower(email))) do update set full_name=excluded.full_name,role=excluded.role,status=excluded.status,updated_at=now() returning id,full_name,email,role,status`;
     return NextResponse.json({ok:true,user:rows?.[0]});
   } catch (error) {

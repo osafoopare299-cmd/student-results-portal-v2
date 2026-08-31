@@ -110,3 +110,25 @@ export async function getLecturerDashboard(userId) {
     ],
   };
 }
+
+export async function getAdminDashboard() {
+  const sql = getSql();
+
+  const [studentRows, lecturerRows, courseRows, yearRows] = await Promise.all([
+    sql`select count(*)::int as total from edu_users where role = 'student' and status = 'active'`,
+    sql`select count(*)::int as total from edu_users where role = 'lecturer' and status = 'active'`,
+    sql`select count(*)::int as total from edu_courses where active = true`,
+    sql`select name from edu_academic_years where is_active = true order by starts_on desc nulls last limit 1`,
+  ]);
+
+  const academicYear = yearRows?.[0]?.name || 'Not assigned';
+  return {
+    academicYear,
+    stats: [
+      ['Students', String(safeNumber(studentRows?.[0]?.total))],
+      ['Lecturers', String(safeNumber(lecturerRows?.[0]?.total))],
+      ['Courses', String(safeNumber(courseRows?.[0]?.total))],
+      ['Academic year', academicYear],
+    ],
+  };
+}

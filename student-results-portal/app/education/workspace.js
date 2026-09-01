@@ -32,7 +32,7 @@ const workspaces = {
     actions: [
       ['Course Materials','Upload notes, PDFs, videos and learning resources',FileText,'/education/lecturer/learning'],
       ['Create Assessment','Build MCQ, written, viva/OSCE and practical assessments',ClipboardCheck,'/education/lecturer/assessments'],
-      ['Marks & Results','Enter marks, review calculations and publish results',BarChart3,'/admin'],
+      ['Marks & Results','Mark submissions, finalize scores and release results',BarChart3,'/education/lecturer/assessments'],
       ['Attendance','Create sessions and record attendance',CheckCircle2,'/education/lecturer/attendance'],
       ['Announcements','Create class updates and review notification activity',MessageSquareText,'/education/lecturer/notifications'],
       ['Class Analytics','Weak topics, progress and assessment performance',Activity,null],
@@ -48,6 +48,7 @@ const workspaces = {
       ['Academic Years','Create academic periods and choose the active year',CalendarDays,'/education/admin/academic-years'],
       ['Course Offerings','Connect courses to classes, years, terms and lecturers',BookOpen,'/education/admin/offerings'],
       ['Enrolments & Assignments','Enrol students and assign lecturers',ClipboardCheck,'/education/admin/assignments'],
+      ['Result Publication','Review finalized Education marks and release them to students',BarChart3,'/education/admin/results'],
       ['Database Setup','Verify isolation and initialize education tables',ShieldCheck,'/education/admin/setup'],
       ['Platform Analytics','Performance, attendance and activity summaries',BarChart3,null],
     ],
@@ -69,7 +70,7 @@ export default function Workspace({ role, user=null, dashboard=null }) {
   const learnHref=role==='lecturer'?'/education/lecturer/learning':role==='student'?'/education/student/learn':null;
   const assessHref=role==='lecturer'?'/education/lecturer/assessments':role==='student'?'/education/student/assess':null;
   const timetableHref=role==='lecturer'?'/education/lecturer/timetable':role==='student'?'/education/student/timetable':null;
-  const resultsHref=role==='student'?'/education/student/results':role==='lecturer'?'/admin':null;
+  const resultsHref=role==='student'?'/education/student/results':role==='lecturer'?'/education/lecturer/assessments':role==='admin'?'/education/admin/results':null;
   const notificationsHref=role==='lecturer'?'/education/lecturer/notifications':role==='student'?'/education/student/notifications':null;
   return <main className={styles.shell}>
     <aside className={`${styles.sidebar} ${menuOpen ? styles.sidebarOpen : ''}`}>

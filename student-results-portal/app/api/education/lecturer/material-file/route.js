@@ -20,7 +20,7 @@ export async function GET(request){
     if(!result||result.statusCode!==200)return NextResponse.json({ok:false,error:'Learning file not found.'},{status:404});
     const filename=String(material.original_filename||'learning-resource').replace(/[\r\n"]/g,'');
     return new NextResponse(result.stream,{headers:{
-      'Content-Type':material.file_content_type||result.blob?.contentType||'application/octet-stream',
+      'Content-Type':result.blob?.contentType||material.file_content_type||'application/octet-stream',
       'Content-Disposition':`inline; filename="${filename}"`,
       'Cache-Control':'private, no-store',
       'X-Content-Type-Options':'nosniff'

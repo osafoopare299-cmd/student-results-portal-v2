@@ -7,7 +7,9 @@ export async function ensureEducationMaterialFileSchema(sql){
 }
 
 export function educationBlobConfigured(){
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.VERCEL_OIDC_TOKEN);
+  // A connected Vercel Blob store injects this project-specific token.
+  // Do not treat the generic Vercel OIDC token as proof that a Blob store exists.
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 
 export function materialFileHref(material,scope='student'){

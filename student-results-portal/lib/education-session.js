@@ -2,6 +2,7 @@ import { getEducationAuth, educationAuthConfigured } from './education-auth';
 import { getEducationSql } from './db';
 
 // Server-side role resolution for authenticated education workspaces.
+// The auth SDK returns the current session inside its `data` property.
 export async function getEducationUser(expectedRole) {
   if (!educationAuthConfigured()) return { ok: false, reason: 'setup' };
   try {

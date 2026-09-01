@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getEducationUser } from '../../../../../../../lib/education-session';
 import { getEducationSql } from '../../../../../../../lib/db';
+import { ensureEducationResultReleaseSchema } from '../../../../../../../lib/education-results-schema';
 
 export const dynamic='force-dynamic';
 const clean=(v,max=4000)=>String(v??'').trim().slice(0,max);
@@ -14,9 +15,11 @@ export async function GET(request,{params}){
   const access=await getEducationUser('lecturer');
   if(!access.ok)return NextResponse.json({ok:false,error:'Lecturer access required.'},{status:401});
   try{
-    const {id}=await params,sql=getEducationSql(),assessment=await ownedAssessment(sql,id,access.user.id);
+    const {id}=await params,sql=getEducationSql();
+    await ensureEducationResultReleaseSchema(sql);
+    const assessment=await ownedAssessment(sql,id,access.user.id);
     if(!assessment)return NextResponse.json({ok:false,error:'Assessment not found.'},{status:404});
-    const attempts=await sql`select t.id,t.status,t.started_at,t.submitted_at,t.score,t.feedback,t.marked_at,u.full_name,u.email from edu_assessment_attempts t join edu_users u on u.id=t.student_user_id where t.assessment_id=${id} and t.status in ('submitted','marked') order by t.submitted_at asc nulls last,u.full_name`;
+    const attempts=await sql`select t.id,t.status,t.started_at,t.submitted_at,t.score,t.feedback,t.marked_at,t.released_at,t.released_by,u.full_name,u.email from edu_assessment_attempts t join edu_users u on u.id=t.student_user_id where t.assessment_id=${id} and t.status in ('submitted','marked') order by t.submitted_at asc nulls last,u.full_name`;
     const attemptId=new URL(request.url).searchParams.get('attemptId');
     if(!attemptId)return NextResponse.json({ok:true,assessment,attempts});
     const attempt=attempts.find(x=>String(x.id)===String(attemptId));
@@ -30,12 +33,15 @@ export async function POST(request,{params}){
   const access=await getEducationUser('lecturer');
   if(!access.ok)return NextResponse.json({ok:false,error:'Lecturer access required.'},{status:401});
   try{
-    const {id}=await params,b=await request.json(),sql=getEducationSql(),assessment=await ownedAssessment(sql,id,access.user.id);
+    const {id}=await params,b=await request.json(),sql=getEducationSql();
+    await ensureEducationResultReleaseSchema(sql);
+    const assessment=await ownedAssessment(sql,id,access.user.id);
     if(!assessment)return NextResponse.json({ok:false,error:'Assessment not found.'},{status:404});
     const attemptId=Number(b.attemptId);
     const attempt=(await sql`select * from edu_assessment_attempts where id=${attemptId} and assessment_id=${id} and status in ('submitted','marked') limit 1`)[0];
     if(!attempt)return NextResponse.json({ok:false,error:'Submission not found.'},{status:404});
     if(b.action==='save-answer'){
+      if(attempt.released_at)return NextResponse.json({ok:false,error:'Released results must be withdrawn before marks can be changed.'},{status:409});
       const questionId=Number(b.questionId),score=Number(b.score),feedback=clean(b.feedback);
       const q=(await sql`select id,max_score,question_type from edu_assessment_questions where id=${questionId} and assessment_id=${id} limit 1`)[0];
       if(!q)return NextResponse.json({ok:false,error:'Question not found.'},{status:404});
@@ -47,6 +53,7 @@ export async function POST(request,{params}){
       return NextResponse.json({ok:true});
     }
     if(b.action==='finalize'){
+      if(attempt.released_at)return NextResponse.json({ok:false,error:'Released results must be withdrawn before finalizing again.'},{status:409});
       const pending=await sql`select q.position from edu_assessment_questions q join edu_assessment_answers a on a.question_id=q.id and a.attempt_id=${attemptId} where q.assessment_id=${id} and q.question_type<>'mcq' and a.score is null order by q.position`;
       if(pending.length)return NextResponse.json({ok:false,error:`Mark all submitted manual answers before finalizing. Pending: ${pending.map(x=>'Q'+x.position).join(', ')}.`},{status:400});
       const totals=await sql`select coalesce(sum(coalesce(a.score,0)),0)::numeric as total from edu_assessment_questions q left join edu_assessment_answers a on a.question_id=q.id and a.attempt_id=${attemptId} where q.assessment_id=${id}`;
@@ -55,7 +62,19 @@ export async function POST(request,{params}){
       const feedback=clean(b.feedback);
       await sql`update edu_assessment_attempts set status='marked',score=${total},feedback=${feedback||null},marked_by=${access.user.id},marked_at=now() where id=${attemptId}`;
       await sql`insert into edu_audit_logs (actor_user_id,action,entity_type,entity_id,metadata) values (${access.user.id},'assessment_attempt_marked','edu_assessment_attempt',${String(attemptId)},${JSON.stringify({assessmentId:String(id),score:total})}::jsonb)`;
-      return NextResponse.json({ok:true,status:'marked',score:total});
+      return NextResponse.json({ok:true,status:'marked',score:total,released:false});
+    }
+    if(b.action==='release'){
+      if(attempt.status!=='marked')return NextResponse.json({ok:false,error:'Finalize marking before releasing this result.'},{status:400});
+      await sql`update edu_assessment_attempts set released_at=coalesce(released_at,now()),released_by=${access.user.id} where id=${attemptId}`;
+      await sql`insert into edu_audit_logs (actor_user_id,action,entity_type,entity_id,metadata) values (${access.user.id},'assessment_result_released','edu_assessment_attempt',${String(attemptId)},${JSON.stringify({assessmentId:String(id)})}::jsonb)`;
+      return NextResponse.json({ok:true,released:true});
+    }
+    if(b.action==='withdraw-release'){
+      if(!attempt.released_at)return NextResponse.json({ok:true,released:false});
+      await sql`update edu_assessment_attempts set released_at=null,released_by=null where id=${attemptId}`;
+      await sql`insert into edu_audit_logs (actor_user_id,action,entity_type,entity_id,metadata) values (${access.user.id},'assessment_result_release_withdrawn','edu_assessment_attempt',${String(attemptId)},${JSON.stringify({assessmentId:String(id)})}::jsonb)`;
+      return NextResponse.json({ok:true,released:false});
     }
     return NextResponse.json({ok:false,error:'Unknown marking action.'},{status:400});
   }catch(error){console.error('Assessment marking save unavailable:',error);return NextResponse.json({ok:false,error:'Unable to save assessment marking.'},{status:503});}

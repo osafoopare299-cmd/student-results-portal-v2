@@ -40,12 +40,22 @@ export async function POST(request){
   try{
     const body=await request.json();
     const courseId=body.courseId||null,classId=body.classId||null,academicYearId=body.academicYearId||null;
-    const lecturerId=body.lecturerId||null,term=String(body.term||'').trim();
+    const lecturerId=body.lecturerId||null,term=String(body.term||'').trim().slice(0,80);
     if(!courseId||!classId||!academicYearId||!term) return NextResponse.json({ok:false,error:'Course, class, academic year and term are required.'},{status:400});
     const sql=getEducationSql();
-    const classRows=await sql`select academic_year_id from edu_classes where id=${classId} limit 1`;
+    const [courseRows,classRows,yearRows]=await Promise.all([
+      sql`select id from edu_courses where id=${courseId} and active=true limit 1`,
+      sql`select academic_year_id from edu_classes where id=${classId} limit 1`,
+      sql`select id from edu_academic_years where id=${academicYearId} limit 1`
+    ]);
+    if(!courseRows.length) return NextResponse.json({ok:false,error:'Selected course was not found or is inactive.'},{status:404});
     if(!classRows?.[0]) return NextResponse.json({ok:false,error:'Selected class was not found.'},{status:404});
+    if(!yearRows.length) return NextResponse.json({ok:false,error:'Selected academic year was not found.'},{status:404});
     if(String(classRows[0].academic_year_id)!==String(academicYearId)) return NextResponse.json({ok:false,error:'The selected class belongs to a different academic year.'},{status:400});
+    if(lecturerId){
+      const lecturerRows=await sql`select id from edu_users where id=${lecturerId} and role='lecturer' and status='active' limit 1`;
+      if(!lecturerRows.length) return NextResponse.json({ok:false,error:'Selected lecturer was not found or is not active.'},{status:400});
+    }
     const rows=await sql`
       insert into edu_course_offerings (course_id,class_id,academic_year_id,lecturer_user_id,term)
       values (${courseId},${classId},${academicYearId},${lecturerId},${term})
@@ -53,7 +63,9 @@ export async function POST(request){
       do update set lecturer_user_id=excluded.lecturer_user_id
       returning id,course_id,class_id,academic_year_id,lecturer_user_id,term
     `;
-    return NextResponse.json({ok:true,offering:rows[0]});
+    const offering=rows[0];
+    await sql`insert into edu_audit_logs(action,entity_type,entity_id,metadata) values('admin_course_offering_saved','course_offering',${String(offering.id)},${JSON.stringify({source:'education_admin',courseId,classId,academicYearId,lecturerId:lecturerId||null,term})}::jsonb)`;
+    return NextResponse.json({ok:true,offering});
   }catch(error){
     console.error('Education offering save unavailable:',error);
     return NextResponse.json({ok:false,error:'Unable to save course offering.'},{status:503});

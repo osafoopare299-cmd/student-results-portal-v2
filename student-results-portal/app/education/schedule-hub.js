@@ -1,70 +1,43 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { ArrowLeft, CalendarDays, CheckCircle2, Clock3, MapPin, Search, Users } from 'lucide-react';
+import { useEffect,useMemo,useState } from 'react';
+import { ArrowLeft,CalendarDays,CheckCircle2,Clock3,MapPin,Search,Users,LoaderCircle,Plus,Save,Send } from 'lucide-react';
 import styles from './schedule-hub.module.css';
 
-const studentEvents = [
-  { day: 'Mon', date: '31 Aug', time: '08:00–12:00', title: 'Paediatrics Ward Rotation', course: 'Paediatrics', place: 'Children’s Ward', type: 'Rotation' },
-  { day: 'Mon', date: '31 Aug', time: '12:30–14:00', title: 'Clinical Pharmacology', course: 'Pharmacology', place: 'Lecture Hall 2', type: 'Lecture' },
-  { day: 'Tue', date: '1 Sep', time: '10:00–11:00', title: 'Shock & Resuscitation Quiz', course: 'Emergency Medicine', place: 'Online', type: 'Assessment' },
-  { day: 'Wed', date: '2 Sep', time: '09:00–11:00', title: 'OSCE Practice', course: 'Clinical Skills', place: 'Skills Lab', type: 'Practical' },
-];
+const fmtDate=v=>{if(!v)return '';const d=new Date(v);return Number.isNaN(d.getTime())?'':d.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'});};
+const fmtTime=v=>{if(!v)return '';const d=new Date(v);return Number.isNaN(d.getTime())?'':d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});};
 
-const attendanceRows = [
-  ['Paediatrics Ward Rotation', '18 / 20', '90%', 'Good'],
-  ['Emergency Medicine', '12 / 12', '100%', 'Excellent'],
-  ['Clinical Pharmacology', '9 / 10', '90%', 'Good'],
-  ['Clinical Skills', '7 / 8', '88%', 'Good'],
-];
+export default function ScheduleHub({role='student',mode='timetable'}){
+  const isLecturer=role==='lecturer',back=`/education/${role}`,peer=mode==='timetable'?`/education/${role}/attendance`:`/education/${role}/timetable`;
+  const [query,setQuery]=useState(''),[data,setData]=useState({events:[],attendance:[],summary:{},offerings:[],sessions:[]}),[loading,setLoading]=useState(true),[message,setMessage]=useState('');
+  const [eventForm,setEventForm]=useState({offeringId:'',title:'',eventType:'class',location:'',startsAt:'',endsAt:''});
+  const [sessionForm,setSessionForm]=useState({offeringId:'',title:'',sessionDate:''});
+  const [sessionDetail,setSessionDetail]=useState(null);
+  const endpoint=isLecturer?'/api/education/lecturer/schedule':'/api/education/student/schedule';
+  async function load(){setLoading(true);try{const r=await fetch(endpoint,{cache:'no-store'}),d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to load schedule.');setData({...d,events:d.events||[],attendance:d.attendance||[],offerings:d.offerings||[],sessions:d.sessions||[],summary:d.summary||{}});}catch(e){setMessage(e.message);}finally{setLoading(false)}}
+  useEffect(()=>{load()},[endpoint]);
+  async function post(body){setMessage('');try{const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to save.');await load();return d}catch(e){setMessage(e.message);return null}}
+  const filtered=useMemo(()=>data.events.filter(e=>`${e.title} ${e.course_title||''} ${e.code||''} ${e.event_type||''}`.toLowerCase().includes(query.toLowerCase())),[data.events,query]);
+  const studentSummary=data.summary||{};
+  const lecturerSessionTotals={sessions:data.sessions.length,present:data.sessions.reduce((a,x)=>a+Number(x.present||0),0),marked:data.sessions.reduce((a,x)=>a+Number(x.marked||0),0)};
+  async function createEvent(e){e.preventDefault();if(await post({action:'create-event',...eventForm})){setEventForm({offeringId:'',title:'',eventType:'class',location:'',startsAt:'',endsAt:''});setMessage('Timetable event created.')}}
+  async function createSession(e){e.preventDefault();if(await post({action:'create-session',...sessionForm})){setSessionForm({offeringId:'',title:'',sessionDate:''});setMessage('Attendance session created.')}}
+  async function openSession(id){const d=await post({action:'load-session',sessionId:id});if(d?.students)setSessionDetail(d)}
+  async function mark(sessionId,studentId,status){const d=await post({action:'mark',sessionId,studentId,status});if(d)await openSession(sessionId)}
+  async function publishSession(id){const d=await post({action:'publish-session',sessionId:id});if(d){setMessage('Attendance session published.');await openSession(id)}}
 
-export default function ScheduleHub({ role = 'student', mode = 'timetable' }) {
-  const [query, setQuery] = useState('');
-  const isLecturer = role === 'lecturer';
-  const filtered = useMemo(() => studentEvents.filter(e => `${e.title} ${e.course} ${e.type}`.toLowerCase().includes(query.toLowerCase())), [query]);
-  const back = `/education/${role}`;
-  const peer = mode === 'timetable' ? `/education/${role}/attendance` : `/education/${role}/timetable`;
-
-  return <main className={styles.page}>
-    <header className={styles.header}>
-      <div>
-        <Link href={back} className={styles.back}><ArrowLeft size={17}/> Back to dashboard</Link>
-        <span className={styles.eyebrow}>{isLecturer ? 'LECTURER WORKSPACE' : 'STUDENT WORKSPACE'}</span>
-        <h1>{mode === 'timetable' ? 'Timetable' : 'Attendance'}</h1>
-        <p>{mode === 'timetable' ? 'Classes, rotations, assessments and deadlines in one academic schedule.' : isLecturer ? 'Create attendance sessions and review class or rotation participation.' : 'Track your class and rotation attendance across enrolled courses.'}</p>
-      </div>
-      <nav className={styles.switcher}>
-        <Link className={mode === 'timetable' ? styles.active : ''} href={`/education/${role}/timetable`}><CalendarDays size={16}/> Timetable</Link>
-        <Link className={mode === 'attendance' ? styles.active : ''} href={`/education/${role}/attendance`}><CheckCircle2 size={16}/> Attendance</Link>
-      </nav>
-    </header>
-
-    {mode === 'timetable' ? <>
-      <section className={styles.summary}>
-        <article><span>This week</span><strong>8</strong><small>scheduled activities</small></article>
-        <article><span>Next activity</span><strong>08:00</strong><small>Paediatrics rotation</small></article>
-        <article><span>Assessments</span><strong>2</strong><small>due this week</small></article>
-      </section>
-      <section className={styles.toolbar}><label><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search timetable"/></label>{isLecturer && <button type="button">+ Add timetable event</button>}</section>
-      <section className={styles.eventList}>
-        {filtered.map(event => <article key={`${event.date}-${event.time}-${event.title}`} className={styles.event}>
-          <div className={styles.dateBlock}><b>{event.day}</b><span>{event.date}</span></div>
-          <div className={styles.eventMain}><span className={styles.type}>{event.type}</span><h2>{event.title}</h2><p>{event.course}</p><div><span><Clock3 size={15}/>{event.time}</span><span><MapPin size={15}/>{event.place}</span></div></div>
-          {isLecturer && <button type="button" className={styles.secondary}>Manage</button>}
-        </article>)}
-      </section>
-    </> : <>
-      <section className={styles.summary}>
-        <article><span>Overall attendance</span><strong>92%</strong><small>{isLecturer ? 'class average' : 'across enrolled courses'}</small></article>
-        <article><span>Sessions</span><strong>50</strong><small>{isLecturer ? 'recorded this term' : 'eligible sessions'}</small></article>
-        <article><span>Present</span><strong>46</strong><small>{isLecturer ? 'average equivalent' : 'sessions attended'}</small></article>
-      </section>
-      {isLecturer && <section className={styles.callout}><Users size={22}/><div><b>Attendance session tools</b><p>Create a class or rotation session, mark students present/absent, and publish the session summary.</p></div><button type="button">Create session</button></section>}
-      <section className={styles.tableCard}>
-        <div className={styles.tableHead}><div><span className={styles.eyebrow}>{isLecturer ? 'COURSE SUMMARY' : 'MY ATTENDANCE'}</span><h2>{isLecturer ? 'Attendance by course' : 'Course attendance'}</h2></div><Link href={peer}>View timetable</Link></div>
-        <div className={styles.rows}>{attendanceRows.map(([course,count,rate,status]) => <div className={styles.row} key={course}><span><b>{course}</b><small>{count} sessions</small></span><strong>{rate}</strong><em>{status}</em></div>)}</div>
-      </section>
-    </>}
-  </main>;
+  return <main className={styles.page}><header className={styles.header}><div><Link href={back} className={styles.back}><ArrowLeft size={17}/> Back to dashboard</Link><span className={styles.eyebrow}>{isLecturer?'LECTURER WORKSPACE':'STUDENT WORKSPACE'}</span><h1>{mode==='timetable'?'Timetable':'Attendance'}</h1><p>{mode==='timetable'?'Live classes, rotations, assessments and academic activities.':isLecturer?'Create attendance sessions, mark enrolled students and publish summaries.':'Your published attendance across enrolled courses.'}</p></div><nav className={styles.switcher}><Link className={mode==='timetable'?styles.active:''} href={`/education/${role}/timetable`}><CalendarDays size={16}/> Timetable</Link><Link className={mode==='attendance'?styles.active:''} href={`/education/${role}/attendance`}><CheckCircle2 size={16}/> Attendance</Link></nav></header>
+  {message&&<p style={{maxWidth:1180,margin:'0 auto 14px',padding:12,borderRadius:12,background:'#fff4df'}}>{message}</p>}
+  {loading?<div style={{display:'flex',gap:8,justifyContent:'center',padding:40}}><LoaderCircle size={20}/> Loading…</div>:mode==='timetable'?<>
+    <section className={styles.summary}><article><span>Scheduled activities</span><strong>{data.events.length}</strong><small>from your Education database</small></article><article><span>Next activity</span><strong>{data.events[0]?fmtTime(data.events[0].starts_at):'—'}</strong><small>{data.events[0]?.title||'Nothing scheduled'}</small></article><article><span>Courses</span><strong>{isLecturer?data.offerings.length:new Set(data.events.map(x=>x.code)).size}</strong><small>connected offerings</small></article></section>
+    <section className={styles.toolbar}><label><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search timetable"/></label></section>
+    {isLecturer&&<section className={styles.callout} style={{alignItems:'stretch'}}><Plus size={22}/><form onSubmit={createEvent} style={{display:'grid',gap:8,flex:1,gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))'}}><select required value={eventForm.offeringId} onChange={e=>setEventForm({...eventForm,offeringId:e.target.value})}><option value="">Course</option>{data.offerings.map(o=><option key={o.id} value={o.id}>{o.code} · {o.class_name}</option>)}</select><input required placeholder="Event title" value={eventForm.title} onChange={e=>setEventForm({...eventForm,title:e.target.value})}/><select value={eventForm.eventType} onChange={e=>setEventForm({...eventForm,eventType:e.target.value})}><option value="class">Class</option><option value="rotation">Rotation</option><option value="assessment">Assessment</option><option value="practical">Practical</option></select><input placeholder="Location" value={eventForm.location} onChange={e=>setEventForm({...eventForm,location:e.target.value})}/><input required type="datetime-local" value={eventForm.startsAt} onChange={e=>setEventForm({...eventForm,startsAt:e.target.value})}/><input required type="datetime-local" value={eventForm.endsAt} onChange={e=>setEventForm({...eventForm,endsAt:e.target.value})}/><button><Save size={17}/> Add event</button></form></section>}
+    <section className={styles.eventList}>{filtered.length?filtered.map(event=><article key={event.id} className={styles.event}><div className={styles.dateBlock}><b>{new Date(event.starts_at).toLocaleDateString(undefined,{weekday:'short'})}</b><span>{fmtDate(event.starts_at).replace(/^\w+,?\s*/,'')}</span></div><div className={styles.eventMain}><span className={styles.type}>{String(event.event_type||'class').toUpperCase()}</span><h2>{event.title}</h2><p>{event.code} · {event.course_title}</p><div><span><Clock3 size={15}/>{fmtTime(event.starts_at)}–{fmtTime(event.ends_at)}</span><span><MapPin size={15}/>{event.location||'Location not specified'}</span></div></div></article>):<div className={styles.tableCard} style={{padding:24}}>No timetable events yet.</div>}</section>
+  </>:<>
+    <section className={styles.summary}><article><span>Overall attendance</span><strong>{isLecturer?(lecturerSessionTotals.marked?Math.round(lecturerSessionTotals.present/lecturerSessionTotals.marked*100):0):Number(studentSummary.rate||0)}%</strong><small>{isLecturer?'across marked records':'published sessions'}</small></article><article><span>Sessions</span><strong>{isLecturer?lecturerSessionTotals.sessions:Number(studentSummary.sessions||0)}</strong><small>{isLecturer?'created':'eligible published sessions'}</small></article><article><span>Present / late</span><strong>{isLecturer?lecturerSessionTotals.present:Number(studentSummary.present||0)}</strong><small>counted as attended</small></article></section>
+    {isLecturer&&<section className={styles.callout}><Users size={22}/><form onSubmit={createSession} style={{display:'grid',gap:8,flex:1,gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))'}}><select required value={sessionForm.offeringId} onChange={e=>setSessionForm({...sessionForm,offeringId:e.target.value})}><option value="">Course</option>{data.offerings.map(o=><option key={o.id} value={o.id}>{o.code} · {o.class_name}</option>)}</select><input required placeholder="Session title" value={sessionForm.title} onChange={e=>setSessionForm({...sessionForm,title:e.target.value})}/><input required type="date" value={sessionForm.sessionDate} onChange={e=>setSessionForm({...sessionForm,sessionDate:e.target.value})}/><button><Plus size={17}/> Create session</button></form></section>}
+    <section className={styles.tableCard}><div className={styles.tableHead}><div><span className={styles.eyebrow}>{isLecturer?'ATTENDANCE SESSIONS':'MY ATTENDANCE'}</span><h2>{isLecturer?'Session management':'Course attendance'}</h2></div><Link href={peer}>View timetable</Link></div><div className={styles.rows}>{isLecturer?data.sessions.map(s=><button key={s.id} onClick={()=>openSession(s.id)} className={styles.row} style={{width:'100%',border:0,textAlign:'left',background:'transparent'}}><span><b>{s.title}</b><small>{s.code} · {s.session_date}</small></span><strong>{s.present}/{s.marked}</strong><em>{s.status}</em></button>):data.attendance.map(x=><div className={styles.row} key={x.code}><span><b>{x.code} · {x.course_title}</b><small>{x.attended} / {x.sessions} sessions</small></span><strong>{x.rate}%</strong><em>{x.rate>=80?'Good':x.rate>=70?'Fair':'Review'}</em></div>)}</div></section>
+    {isLecturer&&sessionDetail&&<section className={styles.tableCard} style={{marginTop:16}}><div className={styles.tableHead}><div><span className={styles.eyebrow}>MARK SESSION</span><h2>{sessionDetail.session.title}</h2></div>{sessionDetail.session.status!=='published'&&<button onClick={()=>publishSession(sessionDetail.session.id)}><Send size={16}/> Publish</button>}</div><div className={styles.rows}>{sessionDetail.students.map(st=><div className={styles.row} key={st.id}><span><b>{st.full_name}</b><small>{st.email}</small></span><select value={st.attendance_status||''} onChange={e=>mark(sessionDetail.session.id,st.id,e.target.value)}><option value="" disabled>Mark</option><option value="present">Present</option><option value="late">Late</option><option value="absent">Absent</option><option value="excused">Excused</option></select><em>{st.attendance_status||'Unmarked'}</em></div>)}</div></section>}
+  </>}</main>
 }

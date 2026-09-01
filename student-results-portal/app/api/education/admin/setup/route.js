@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { isAdmin } from '../../../../../lib/admin-auth';
 import { educationDatabaseIsIsolated, getEducationSql } from '../../../../../lib/db';
+import { ensureEducationAttendanceSchema } from '../../../../../lib/education-attendance';
+import { ensureEducationResultReleaseSchema } from '../../../../../lib/education-results-schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,18 +22,28 @@ async function status(sql){
       to_regclass('public.edu_assessments') is not null as assessments,
       to_regclass('public.edu_assessment_questions') is not null as assessment_questions,
       to_regclass('public.edu_assessment_attempts') is not null as assessment_attempts,
-      to_regclass('public.edu_assessment_answers') is not null as assessment_answers
+      to_regclass('public.edu_assessment_answers') is not null as assessment_answers,
+      to_regclass('public.edu_attendance_sessions') is not null as attendance_sessions,
+      to_regclass('public.edu_attendance_records') is not null as attendance_records,
+      exists(select 1 from information_schema.columns where table_schema='public' and table_name='edu_assessment_attempts' and column_name='released_at') as release_column
   `;
   const s=rows?.[0]||{};
-  return {foundation:Boolean(s.users&&s.courses&&s.offerings&&s.enrolments),materials:Boolean(s.materials),assessments:Boolean(s.assessments&&s.assessment_questions&&s.assessment_attempts&&s.assessment_answers)};
+  return {
+    foundation:Boolean(s.users&&s.courses&&s.offerings&&s.enrolments),
+    materials:Boolean(s.materials),
+    assessments:Boolean(s.assessments&&s.assessment_questions&&s.assessment_attempts&&s.assessment_answers),
+    attendance:Boolean(s.attendance_sessions&&s.attendance_records),
+    resultRelease:Boolean(s.release_column),
+  };
 }
 
+function emptyStatus(){return {foundation:false,materials:false,assessments:false,attendance:false,resultRelease:false};}
 function setupState(databaseStatus){return {ok:true,configured:Boolean(process.env.EDUCATION_DATABASE_URL),isolated:educationDatabaseIsIsolated(),status:databaseStatus};}
 
 export async function GET(){
   const denied=await guard(); if(denied) return denied;
-  if(!process.env.EDUCATION_DATABASE_URL) return NextResponse.json({ok:true,configured:false,isolated:false,status:{foundation:false,materials:false,assessments:false}});
-  if(!educationDatabaseIsIsolated()) return NextResponse.json({ok:false,configured:true,isolated:false,error:'Education database must be isolated from the results database.',status:{foundation:false,materials:false,assessments:false}},{status:409});
+  if(!process.env.EDUCATION_DATABASE_URL) return NextResponse.json({ok:true,configured:false,isolated:false,status:emptyStatus()});
+  if(!educationDatabaseIsIsolated()) return NextResponse.json({ok:false,configured:true,isolated:false,error:'Education database must be isolated from the results database.',status:emptyStatus()},{status:409});
   try{const sql=getEducationSql();return NextResponse.json(setupState(await status(sql)));}catch(error){console.error('Education setup status failed:',error);return NextResponse.json({ok:false,configured:true,isolated:true,error:'Unable to connect to the education database.'},{status:503});}
 }
 
@@ -73,6 +85,8 @@ export async function POST(){
     await sql`create index if not exists edu_assessments_creator_idx on edu_assessments(created_by,created_at desc)`;
     await sql`create index if not exists edu_assessment_questions_assessment_idx on edu_assessment_questions(assessment_id,position)`;
     await sql`create index if not exists edu_assessment_attempts_student_idx on edu_assessment_attempts(student_user_id,assessment_id)`;
+    await ensureEducationAttendanceSchema(sql);
+    await ensureEducationResultReleaseSchema(sql);
     return NextResponse.json(setupState(await status(sql)));
   }catch(error){console.error('Education setup failed:',error);return NextResponse.json({ok:false,configured:true,isolated:true,error:'Education database setup failed. No production database changes were attempted.'},{status:503});}
 }

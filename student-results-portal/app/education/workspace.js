@@ -50,7 +50,7 @@ const workspaces = {
       ['Enrolments & Assignments','Enrol students and assign lecturers',ClipboardCheck,'/education/admin/assignments'],
       ['Result Publication','Review finalized Education marks and release them to students',BarChart3,'/education/admin/results'],
       ['Database Setup','Verify isolation and initialize education tables',ShieldCheck,'/education/admin/setup'],
-      ['Platform Analytics','Performance, attendance and activity summaries',BarChart3,null],
+      ['Platform Analytics','Performance, attendance and activity summaries',BarChart3,'/education/admin/analytics'],
     ],
   },
 };

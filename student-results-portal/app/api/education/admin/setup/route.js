@@ -16,25 +16,22 @@ async function status(sql){
       to_regclass('public.edu_courses') is not null as courses,
       to_regclass('public.edu_course_offerings') is not null as offerings,
       to_regclass('public.edu_enrolments') is not null as enrolments,
-      to_regclass('public.edu_learning_materials') is not null as materials
+      to_regclass('public.edu_learning_materials') is not null as materials,
+      to_regclass('public.edu_assessments') is not null as assessments,
+      to_regclass('public.edu_assessment_questions') is not null as assessment_questions,
+      to_regclass('public.edu_assessment_attempts') is not null as assessment_attempts,
+      to_regclass('public.edu_assessment_answers') is not null as assessment_answers
   `;
   const s=rows?.[0]||{};
-  return {foundation:Boolean(s.users&&s.courses&&s.offerings&&s.enrolments),materials:Boolean(s.materials)};
+  return {foundation:Boolean(s.users&&s.courses&&s.offerings&&s.enrolments),materials:Boolean(s.materials),assessments:Boolean(s.assessments&&s.assessment_questions&&s.assessment_attempts&&s.assessment_answers)};
 }
 
-function setupState(databaseStatus){
-  return {
-    ok:true,
-    configured:Boolean(process.env.EDUCATION_DATABASE_URL),
-    isolated:educationDatabaseIsIsolated(),
-    status:databaseStatus,
-  };
-}
+function setupState(databaseStatus){return {ok:true,configured:Boolean(process.env.EDUCATION_DATABASE_URL),isolated:educationDatabaseIsIsolated(),status:databaseStatus};}
 
 export async function GET(){
   const denied=await guard(); if(denied) return denied;
-  if(!process.env.EDUCATION_DATABASE_URL) return NextResponse.json({ok:true,configured:false,isolated:false,status:{foundation:false,materials:false}});
-  if(!educationDatabaseIsIsolated()) return NextResponse.json({ok:false,configured:true,isolated:false,error:'Education database must be isolated from the results database.',status:{foundation:false,materials:false}},{status:409});
+  if(!process.env.EDUCATION_DATABASE_URL) return NextResponse.json({ok:true,configured:false,isolated:false,status:{foundation:false,materials:false,assessments:false}});
+  if(!educationDatabaseIsIsolated()) return NextResponse.json({ok:false,configured:true,isolated:false,error:'Education database must be isolated from the results database.',status:{foundation:false,materials:false,assessments:false}},{status:409});
   try{const sql=getEducationSql();return NextResponse.json(setupState(await status(sql)));}catch(error){console.error('Education setup status failed:',error);return NextResponse.json({ok:false,configured:true,isolated:true,error:'Unable to connect to the education database.'},{status:503});}
 }
 
@@ -68,6 +65,14 @@ export async function POST(){
     await sql`create table if not exists edu_learning_materials (id bigserial primary key,offering_id bigint not null references edu_course_offerings(id) on delete cascade,created_by bigint not null references edu_users(id),title text not null,description text,material_type text not null default 'note' check (material_type in ('note','pdf','video','link')),resource_url text,content_text text,is_offline_available boolean not null default false,is_ai_approved boolean not null default false,published_at timestamptz,created_at timestamptz not null default now(),updated_at timestamptz not null default now())`;
     await sql`create index if not exists edu_learning_materials_offering_idx on edu_learning_materials(offering_id,published_at desc)`;
     await sql`create index if not exists edu_learning_materials_ai_idx on edu_learning_materials(offering_id,is_ai_approved) where published_at is not null`;
+    await sql`create table if not exists edu_assessments (id bigserial primary key,offering_id bigint not null references edu_course_offerings(id) on delete cascade,created_by bigint not null references edu_users(id),title text not null,description text,assessment_type text not null check (assessment_type in ('mcq','written','viva','osce','practical')),max_score numeric(8,2) not null default 100 check (max_score>0),opens_at timestamptz,closes_at timestamptz,duration_minutes integer check (duration_minutes is null or duration_minutes>0),instructions text,status text not null default 'draft' check (status in ('draft','published','closed')),created_at timestamptz not null default now(),updated_at timestamptz not null default now(),check (closes_at is null or opens_at is null or closes_at>opens_at))`;
+    await sql`create table if not exists edu_assessment_questions (id bigserial primary key,assessment_id bigint not null references edu_assessments(id) on delete cascade,position integer not null default 1 check (position>0),question_type text not null check (question_type in ('mcq','short','long','viva','osce','practical')),prompt text not null,options jsonb not null default '[]'::jsonb,correct_answer jsonb,max_score numeric(8,2) not null default 1 check (max_score>=0),required boolean not null default true,created_at timestamptz not null default now(),unique(assessment_id,position))`;
+    await sql`create table if not exists edu_assessment_attempts (id bigserial primary key,assessment_id bigint not null references edu_assessments(id) on delete cascade,student_user_id bigint not null references edu_users(id) on delete cascade,status text not null default 'started' check (status in ('started','submitted','marked')),started_at timestamptz not null default now(),submitted_at timestamptz,score numeric(8,2),feedback text,marked_by bigint references edu_users(id),marked_at timestamptz,unique(assessment_id,student_user_id))`;
+    await sql`create table if not exists edu_assessment_answers (id bigserial primary key,attempt_id bigint not null references edu_assessment_attempts(id) on delete cascade,question_id bigint not null references edu_assessment_questions(id) on delete cascade,answer jsonb not null default '{}'::jsonb,score numeric(8,2),feedback text,updated_at timestamptz not null default now(),unique(attempt_id,question_id))`;
+    await sql`create index if not exists edu_assessments_offering_idx on edu_assessments(offering_id,status,opens_at,closes_at)`;
+    await sql`create index if not exists edu_assessments_creator_idx on edu_assessments(created_by,created_at desc)`;
+    await sql`create index if not exists edu_assessment_questions_assessment_idx on edu_assessment_questions(assessment_id,position)`;
+    await sql`create index if not exists edu_assessment_attempts_student_idx on edu_assessment_attempts(student_user_id,assessment_id)`;
     return NextResponse.json(setupState(await status(sql)));
   }catch(error){console.error('Education setup failed:',error);return NextResponse.json({ok:false,configured:true,isolated:true,error:'Education database setup failed. No production database changes were attempted.'},{status:503});}
 }

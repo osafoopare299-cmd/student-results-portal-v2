@@ -19,12 +19,13 @@ export async function POST(request){
  const access=await getEducationUser('lecturer'); if(!access.ok)return NextResponse.json({ok:false,error:'Lecturer access required.'},{status:401});
  try{
   const b=await request.json(),sql=getEducationSql();await ensureEducationMaterialFileSchema(sql);
-  const offeringId=b.offeringId,title=clean(b.title,240),description=clean(b.description,2000)||null,materialType=clean(b.materialType,20)||'note',resourceUrl=clean(b.resourceUrl,1500)||null,contentText=clean(b.contentText,20000)||null;
+  const offeringId=Number(b.offeringId),title=clean(b.title,240),description=clean(b.description,2000)||null,materialType=clean(b.materialType,20)||'note',resourceUrl=clean(b.resourceUrl,1500)||null,contentText=clean(b.contentText,20000)||null;
   const blobPathname=clean(b.blobPathname,2000)||null,originalFilename=clean(b.originalFilename,500)||null,fileContentType=clean(b.fileContentType,200)||null,fileSizeBytes=Number(b.fileSizeBytes||0)||null;
-  if(!offeringId||!title||!['note','pdf','video','link'].includes(materialType))return NextResponse.json({ok:false,error:'Course offering, title and valid material type are required.'},{status:400});
+  if(!Number.isFinite(offeringId)||!title||!['note','pdf','video','link'].includes(materialType))return NextResponse.json({ok:false,error:'Course offering, title and valid material type are required.'},{status:400});
   if(materialType==='link'&&!resourceUrl)return NextResponse.json({ok:false,error:'A resource URL is required for link materials.'},{status:400});
   if(['pdf','video'].includes(materialType)&&!resourceUrl&&!blobPathname)return NextResponse.json({ok:false,error:'Upload a file or provide a resource URL for PDF and video materials.'},{status:400});
   if(blobPathname&&!['pdf','video'].includes(materialType))return NextResponse.json({ok:false,error:'Uploaded files can only be attached to PDF or video materials.'},{status:400});
+  if(blobPathname&&!blobPathname.startsWith(`education/${offeringId}/`))return NextResponse.json({ok:false,error:'Uploaded file does not belong to the selected course offering.'},{status:400});
   if(blobPathname&&!educationBlobConfigured())return NextResponse.json({ok:false,error:'File storage is not configured.'},{status:503});
   if(Boolean(b.aiApproved)&&!contentText)return NextResponse.json({ok:false,error:'Add approved text/content before enabling this material as an AI Tutor source.'},{status:400});
   const own=await sql`select id from edu_course_offerings where id=${offeringId} and lecturer_user_id=${access.user.id} limit 1`;

@@ -13,8 +13,8 @@ export default async function EducationAdminLayout({children}){
       <div style={{display:'flex',alignItems:'center',gap:'12px',color:'#14532d',marginBottom:'26px'}}><span style={{width:'42px',height:'42px',display:'grid',placeItems:'center',borderRadius:'14px',background:'#e8f5ec'}}><Stethoscope size={22}/></span><div><b style={{display:'block',fontSize:'18px'}}>Dropare Education</b><small style={{color:'#64748b'}}>Administrator security</small></div></div>
       <div style={{width:'54px',height:'54px',display:'grid',placeItems:'center',borderRadius:'18px',background:'#ecfdf3',color:'#166534',marginBottom:'18px'}}><LockKeyhole size={26}/></div>
       <h1 style={{fontSize:'28px',lineHeight:1.1,margin:'0 0 10px',color:'#102418'}}>Administrator sign-in required</h1>
-      <p style={{margin:'0 0 24px',lineHeight:1.65,color:'#64748b'}}>Sign in through the existing administrator portal to access Education administration tools.</p>
-      <Link href="/admin" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'9px',textDecoration:'none',background:'#166534',color:'#fff',fontWeight:700,padding:'14px 18px',borderRadius:'14px'}}><ShieldCheck size={18}/> Open administrator sign-in</Link>
+      <p style={{margin:'0 0 24px',lineHeight:1.65,color:'#64748b'}}>Sign in securely to access Education administration tools.</p>
+      <Link href="/education/admin-login" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'9px',textDecoration:'none',background:'#166534',color:'#fff',fontWeight:700,padding:'14px 18px',borderRadius:'14px'}}><ShieldCheck size={18}/> Open Education administrator sign-in</Link>
       <Link href="/education" style={{display:'block',textAlign:'center',marginTop:'16px',color:'#166534',fontWeight:700,textDecoration:'none'}}>Back to Education</Link>
     </section>
   </main>;

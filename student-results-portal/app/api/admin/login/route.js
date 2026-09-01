@@ -9,7 +9,7 @@ export async function POST(request) {
     if (String(password || '') !== expected) return NextResponse.json({ error: 'Incorrect administrator password.' }, { status: 401 });
     const response = NextResponse.json({ ok: true });
     response.cookies.set(adminCookie.name, createAdminToken(), {
-      httpOnly: true, secure: true, sameSite: 'strict', path: '/', maxAge: adminCookie.maxAge,
+      httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: adminCookie.maxAge,
     });
     return response;
   } catch { return NextResponse.json({ error: 'Unable to sign in.' }, { status: 500 }); }

@@ -39,7 +39,22 @@ export async function GET(){
 export async function POST(request){
   const denied=await guard();if(denied)return denied;
   try{
-    const b=await request.json(),attemptId=Number(b.attemptId),sql=getEducationSql();await ensureEducationResultReleaseSchema(sql);
+    const b=await request.json(),sql=getEducationSql();await ensureEducationResultReleaseSchema(sql);
+    if(b.action==='release-assessment'||b.action==='withdraw-assessment'){
+      const assessmentId=Number(b.assessmentId);
+      if(!Number.isFinite(assessmentId))return NextResponse.json({ok:false,error:'A valid assessment is required.'},{status:400});
+      const assessment=(await sql`select id,title from edu_assessments where id=${assessmentId} limit 1`)[0];
+      if(!assessment)return NextResponse.json({ok:false,error:'Assessment not found.'},{status:404});
+      if(b.action==='release-assessment'){
+        const changed=await sql`update edu_assessment_attempts set released_at=coalesce(released_at,now()) where assessment_id=${assessmentId} and status='marked' and released_at is null returning id`;
+        await sql`insert into edu_audit_logs (action,entity_type,entity_id,metadata) values ('assessment_results_batch_released_by_admin','edu_assessment',${String(assessmentId)},${JSON.stringify({assessmentTitle:assessment.title,count:changed.length,source:'education_admin'})}::jsonb)`;
+        return NextResponse.json({ok:true,released:true,count:changed.length});
+      }
+      const changed=await sql`update edu_assessment_attempts set released_at=null,released_by=null where assessment_id=${assessmentId} and status='marked' and released_at is not null returning id`;
+      await sql`insert into edu_audit_logs (action,entity_type,entity_id,metadata) values ('assessment_results_batch_release_withdrawn_by_admin','edu_assessment',${String(assessmentId)},${JSON.stringify({assessmentTitle:assessment.title,count:changed.length,source:'education_admin'})}::jsonb)`;
+      return NextResponse.json({ok:true,released:false,count:changed.length});
+    }
+    const attemptId=Number(b.attemptId);
     if(!Number.isFinite(attemptId))return NextResponse.json({ok:false,error:'A valid result is required.'},{status:400});
     const attempt=(await sql`select id,status,released_at,assessment_id from edu_assessment_attempts where id=${attemptId} limit 1`)[0];
     if(!attempt||attempt.status!=='marked')return NextResponse.json({ok:false,error:'Finalized result not found.'},{status:404});

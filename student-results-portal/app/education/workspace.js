@@ -35,7 +35,7 @@ const workspaces = {
       ['Marks & Results','Mark submissions, finalize scores and release results',BarChart3,'/education/lecturer/assessments'],
       ['Attendance','Create sessions and record attendance',CheckCircle2,'/education/lecturer/attendance'],
       ['Announcements','Create class updates and review notification activity',MessageSquareText,'/education/lecturer/notifications'],
-      ['Class Analytics','Weak topics, progress and assessment performance',Activity,null],
+      ['Class Analytics','Course performance, pass rates, attendance and marking backlog',Activity,'/education/lecturer/analytics'],
     ],
   },
   admin: {

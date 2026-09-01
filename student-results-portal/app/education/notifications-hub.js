@@ -1,35 +1,26 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { ArrowLeft, Bell, BookOpen, CalendarDays, CheckCircle2, ClipboardCheck, GraduationCap, MailCheck, Megaphone, Search, Send, ShieldCheck } from 'lucide-react';
+import { useEffect,useMemo,useState } from 'react';
+import { ArrowLeft,Bell,CalendarDays,GraduationCap,MailCheck,Megaphone,Search,Send,ShieldCheck,LoaderCircle } from 'lucide-react';
 import styles from './notifications.module.css';
 
-const studentItems=[
-  {type:'Result',title:'Emergency Medicine result published',copy:'Your published assessment result is ready to view.',time:'Today · 18:40',icon:CheckCircle2,href:'/education/student/results'},
-  {type:'Assignment',title:'Paediatrics case write-up due soon',copy:'Submission closes Tuesday at 17:00.',time:'Today · 14:15',icon:ClipboardCheck,href:'/education/student/assess'},
-  {type:'Announcement',title:'Clinical rotation venue updated',copy:'Tomorrow’s ward rotation starts at the Children’s Emergency Unit.',time:'Yesterday · 20:10',icon:Megaphone,href:'/education/student/timetable'},
-  {type:'Learning',title:'New shock resuscitation notes added',copy:'A new approved PDF is available in Emergency Medicine.',time:'Yesterday · 16:30',icon:BookOpen,href:'/education/student/learn'},
-];
-
-const lecturerItems=[
-  {type:'Assessment',title:'Emergency Medicine Quiz',copy:'24 submissions received; marking can begin.',time:'Today · 17:45',icon:ClipboardCheck},
-  {type:'Attendance',title:'Paediatrics attendance session saved',copy:'42 students were recorded for today’s rotation.',time:'Today · 12:20',icon:CheckCircle2},
-  {type:'System',title:'Publication email delivery complete',copy:'Result notification batch completed successfully.',time:'Yesterday · 19:05',icon:MailCheck},
-];
+const fmt=v=>{if(!v)return '';const d=new Date(v);return Number.isNaN(d.getTime())?'':d.toLocaleString([], {dateStyle:'medium',timeStyle:'short'});};
 
 export default function NotificationsHub({role='student'}){
-  const [query,setQuery]=useState('');
-  const [draft,setDraft]=useState({title:'',message:'',audience:'Assigned class'});
-  const items=role==='lecturer'?lecturerItems:studentItems;
-  const filtered=useMemo(()=>items.filter(x=>`${x.type} ${x.title} ${x.copy}`.toLowerCase().includes(query.toLowerCase())),[items,query]);
+  const isLecturer=role==='lecturer',endpoint=isLecturer?'/api/education/lecturer/notifications':'/api/education/student/notifications';
+  const [query,setQuery]=useState(''),[loading,setLoading]=useState(true),[message,setMessage]=useState(''),[items,setItems]=useState([]),[offerings,setOfferings]=useState([]);
+  const [draft,setDraft]=useState({offeringId:'',title:'',message:''});
+  async function load(){setLoading(true);try{const r=await fetch(endpoint,{cache:'no-store'}),d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to load announcements.');setItems(d.announcements||[]);setOfferings(d.offerings||[]);}catch(e){setMessage(e.message);}finally{setLoading(false)}}
+  useEffect(()=>{load()},[endpoint]);
+  const filtered=useMemo(()=>items.filter(x=>`${x.title||''} ${x.body||''} ${x.code||''} ${x.course_title||''}`.toLowerCase().includes(query.toLowerCase())),[items,query]);
+  async function publish(e){e.preventDefault();setMessage('');try{const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(draft)}),d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to publish announcement.');setDraft({offeringId:'',title:'',message:''});setMessage('Announcement published.');await load();}catch(err){setMessage(err.message)}}
   const dashboard=`/education/${role}`;
-  return <main className={styles.page}>
-    <header className={styles.top}><Link href={dashboard}><ArrowLeft size={19}/> Dashboard</Link><div><GraduationCap size={21}/><b>Dropare Education</b></div><span><ShieldCheck size={18}/> Preview</span></header>
-    <section className={styles.hero}><div><span>{role==='lecturer'?'LECTURER COMMUNICATION':'STUDENT NOTIFICATIONS'}</span><h1>{role==='lecturer'?'Announcements & notifications':'Your updates in one place'}</h1><p>{role==='lecturer'?'Create class announcements and review delivery activity.':'Published results, assignments, timetable changes and learning updates appear here.'}</p></div><Bell size={34}/></section>
-    <div className={styles.layout}>
-      <section className={styles.panel}><div className={styles.panelHead}><div><span>INBOX</span><h2>Recent activity</h2></div><div className={styles.search}><Search size={17}/><input placeholder="Search updates" value={query} onChange={e=>setQuery(e.target.value)}/></div></div><div className={styles.list}>{filtered.map((item,i)=>{const Icon=item.icon;const content=<><span className={styles.icon}><Icon size={19}/></span><span className={styles.copy}><small>{item.type}</small><strong>{item.title}</strong><p>{item.copy}</p><em>{item.time}</em></span></>;return item.href?<Link className={styles.item} href={item.href} key={i}>{content}</Link>:<article className={styles.item} key={i}>{content}</article>})}</div></section>
-      {role==='lecturer'?<section className={`${styles.panel} ${styles.compose}`}><div className={styles.panelHead}><div><span>ANNOUNCEMENT</span><h2>Create update</h2></div><Megaphone size={20}/></div><label>Audience<select value={draft.audience} onChange={e=>setDraft({...draft,audience:e.target.value})}><option>Assigned class</option><option>All my students</option><option>Course group</option></select></label><label>Title<input value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})} placeholder="Announcement title"/></label><label>Message<textarea value={draft.message} onChange={e=>setDraft({...draft,message:e.target.value})} placeholder="Write the announcement…" rows={6}/></label><button disabled><Send size={18}/> Publish after database connection</button><p className={styles.note}>The composer is intentionally disabled in preview. Server-side course/class permission checks will be enforced before announcements can be published.</p></section>:<section className={`${styles.panel} ${styles.pref}`}><div className={styles.panelHead}><div><span>DELIVERY</span><h2>Notification channels</h2></div><MailCheck size={20}/></div><div className={styles.channel}><span>Email alerts</span><b>Enabled for published results</b></div><div className={styles.channel}><span>In-app notifications</span><b>Prepared</b></div><div className={styles.channel}><span>Offline reminders</span><b>PWA phase</b></div><div className={styles.tip}><CalendarDays size={18}/><p>Timetable and deadline notifications will use the student’s enrolled courses once authentication is connected.</p></div></section>}
-    </div>
-  </main>;
+  return <main className={styles.page}><header className={styles.top}><Link href={dashboard}><ArrowLeft size={19}/> Dashboard</Link><div><GraduationCap size={21}/><b>Dropare Education</b></div><span><ShieldCheck size={18}/> Secure</span></header>
+    <section className={styles.hero}><div><span>{isLecturer?'LECTURER COMMUNICATION':'STUDENT NOTIFICATIONS'}</span><h1>{isLecturer?'Announcements & notifications':'Your updates in one place'}</h1><p>{isLecturer?'Publish course announcements directly to enrolled students.':'Course announcements published by your lecturers appear here.'}</p></div><Bell size={34}/></section>
+    {message&&<p style={{maxWidth:1180,margin:'0 auto 14px',padding:12,borderRadius:12,background:'#fff4df'}}>{message}</p>}
+    <div className={styles.layout}><section className={styles.panel}><div className={styles.panelHead}><div><span>INBOX</span><h2>{isLecturer?'Published announcements':'Recent announcements'}</h2></div><div className={styles.search}><Search size={17}/><input placeholder="Search updates" value={query} onChange={e=>setQuery(e.target.value)}/></div></div>
+      <div className={styles.list}>{loading?<div className={styles.item}><LoaderCircle size={19}/><span className={styles.copy}><strong>Loading announcements…</strong></span></div>:filtered.length?filtered.map(item=><article className={styles.item} key={item.id}><span className={styles.icon}><Megaphone size={19}/></span><span className={styles.copy}><small>{item.code?`${item.code} · ${item.course_title}`:'Announcement'}</small><strong>{item.title}</strong><p>{item.body}</p><em>{fmt(item.published_at||item.created_at)}{item.author_name?` · ${item.author_name}`:''}</em></span></article>):<article className={styles.item}><span className={styles.icon}><Bell size={19}/></span><span className={styles.copy}><strong>No announcements yet</strong><p>{isLecturer?'Publish your first course announcement.':'New lecturer announcements will appear here.'}</p></span></article>}</div></section>
+      {isLecturer?<section className={`${styles.panel} ${styles.compose}`}><div className={styles.panelHead}><div><span>ANNOUNCEMENT</span><h2>Create update</h2></div><Megaphone size={20}/></div><form onSubmit={publish}><label>Course<select required value={draft.offeringId} onChange={e=>setDraft({...draft,offeringId:e.target.value})}><option value="">Select assigned course</option>{offerings.map(o=><option key={o.id} value={o.id}>{o.code} · {o.course_title} · {o.class_name}</option>)}</select></label><label>Title<input required value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})} placeholder="Announcement title"/></label><label>Message<textarea required value={draft.message} onChange={e=>setDraft({...draft,message:e.target.value})} placeholder="Write the announcement…" rows={6}/></label><button><Send size={18}/> Publish announcement</button></form><p className={styles.note}>Only students enrolled in the selected course/class can receive this announcement.</p></section>:<section className={`${styles.panel} ${styles.pref}`}><div className={styles.panelHead}><div><span>DELIVERY</span><h2>Notification channels</h2></div><MailCheck size={20}/></div><div className={styles.channel}><span>In-app announcements</span><b>Live</b></div><div className={styles.channel}><span>Published result alerts</span><b>Existing email workflow retained</b></div><div className={styles.channel}><span>Offline reminders</span><b>PWA phase</b></div><div className={styles.tip}><CalendarDays size={18}/><p>Announcements are filtered automatically using your active Education enrolments.</p></div></section>}
+    </div></main>
 }

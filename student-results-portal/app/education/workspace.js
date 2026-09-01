@@ -48,6 +48,7 @@ const workspaces = {
       ['Academic Years','Create academic periods and choose the active year',CalendarDays,'/education/admin/academic-years'],
       ['Course Offerings','Connect courses to classes, years, terms and lecturers',BookOpen,'/education/admin/offerings'],
       ['Enrolments & Assignments','Enrol students and assign lecturers',ClipboardCheck,'/education/admin/assignments'],
+      ['Grading Scheme','Configure grade boundaries and PASS/REVIEW outcomes',CheckCircle2,'/education/admin/grading'],
       ['Result Publication','Review finalized Education marks and release them to students',BarChart3,'/education/admin/results'],
       ['Database Setup','Verify isolation and initialize education tables',ShieldCheck,'/education/admin/setup'],
       ['Platform Analytics','Performance, attendance and activity summaries',BarChart3,'/education/admin/analytics'],

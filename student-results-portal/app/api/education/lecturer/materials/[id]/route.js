@@ -31,6 +31,7 @@ export async function PATCH(request,{params}){
     if(materialType==='link'&&!resourceUrl)return NextResponse.json({ok:false,error:'A resource URL is required for link materials.'},{status:400});
     if(['pdf','video'].includes(materialType)&&!resourceUrl&&!blobPathname)return NextResponse.json({ok:false,error:'Upload a file or provide a resource URL for PDF and video materials.'},{status:400});
     if(blobPathname&&!['pdf','video'].includes(materialType))return NextResponse.json({ok:false,error:'Uploaded files can only be attached to PDF or video materials.'},{status:400});
+    if(blobPathname&&!String(blobPathname).startsWith(`education/${material.offering_id}/`))return NextResponse.json({ok:false,error:'Uploaded file does not belong to this course offering.'},{status:400});
     const offline=b.offline===undefined?material.is_offline_available:Boolean(b.offline);
     const aiApproved=b.aiApproved===undefined?material.is_ai_approved:Boolean(b.aiApproved);
     if(aiApproved&&!contentText)return NextResponse.json({ok:false,error:'Add approved text/content before enabling this material as an AI Tutor source.'},{status:400});

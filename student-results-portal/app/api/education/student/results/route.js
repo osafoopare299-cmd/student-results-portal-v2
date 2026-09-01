@@ -13,13 +13,13 @@ export async function GET(){
     const sql=getEducationSql();
     await ensureEducationResultReleaseSchema(sql);
     const [rows,bands]=await Promise.all([
-      sql`select t.id as attempt_id,t.score,t.feedback,t.marked_at,t.submitted_at,t.released_at,a.id as assessment_id,a.title,a.assessment_type,a.max_score,c.code,c.title as course_title,cl.name as class_name,y.name as academic_year,o.term from edu_assessment_attempts t join edu_assessments a on a.id=t.assessment_id join edu_course_offerings o on o.id=a.offering_id join edu_courses c on c.id=o.course_id join edu_classes cl on cl.id=o.class_id join edu_academic_years y on y.id=o.academic_year_id where t.student_user_id=${access.user.id} and t.status='marked' and t.released_at is not null order by t.released_at desc,t.marked_at desc nulls last,t.submitted_at desc`,
+      sql`select t.id as attempt_id,t.score,t.feedback,t.marked_at,t.submitted_at,t.released_at,a.id as assessment_id,a.title,a.assessment_type,a.max_score,c.code,c.title as course_title,cl.name as class_name,y.name as academic_year,o.term,rnk.class_position,rnk.released_cohort_size from edu_assessment_attempts t join edu_assessments a on a.id=t.assessment_id join edu_course_offerings o on o.id=a.offering_id join edu_courses c on c.id=o.course_id join edu_classes cl on cl.id=o.class_id join edu_academic_years y on y.id=o.academic_year_id left join (select t2.id,dense_rank() over (partition by t2.assessment_id order by t2.score desc nulls last)::int as class_position,count(*) over (partition by t2.assessment_id)::int as released_cohort_size from edu_assessment_attempts t2 where t2.status='marked' and t2.released_at is not null) rnk on rnk.id=t.id where t.student_user_id=${access.user.id} and t.status='marked' and t.released_at is not null order by t.released_at desc,t.marked_at desc nulls last,t.submitted_at desc`,
       getEducationGradingBands(sql)
     ]);
     const results=rows.map(r=>{
       const score=Number(r.score||0),maxScore=Number(r.max_score||0),percentage=maxScore>0?Math.round((score/maxScore)*10000)/100:0;
       const grading=applyEducationGrade(percentage,bands);
-      return {...r,percentage,grade:grading.grade,outcome:grading.outcome};
+      return {...r,percentage,grade:grading.grade,outcome:grading.outcome,classPosition:Number(r.class_position||0)||null,releasedCohortSize:Number(r.released_cohort_size||0)||null};
     });
     const percentages=results.map(r=>r.percentage);
     const average=percentages.length?Math.round((percentages.reduce((a,b)=>a+b,0)/percentages.length)*100)/100:0;

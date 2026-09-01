@@ -4,6 +4,7 @@ import { getEducationSql } from '../../../../../lib/db';
 
 export const dynamic='force-dynamic';
 async function guard(){ if(!(await isAdmin())) return NextResponse.json({ok:false,error:'Administrator sign-in required.'},{status:401}); return null; }
+const audit=async(sql,action,entityType,entityId,metadata={})=>sql`insert into edu_audit_logs(action,entity_type,entity_id,metadata) values(${action},${entityType},${entityId?String(entityId):null},${JSON.stringify({source:'education_admin',...metadata})}::jsonb)`;
 
 export async function GET(){
  const denied=await guard(); if(denied) return denied;
@@ -24,18 +25,25 @@ export async function POST(request){
   const body=await request.json(); const sql=getEducationSql();
   if(body.action==='assign-lecturer'){
    if(!body.offeringId) return NextResponse.json({ok:false,error:'Course offering is required.'},{status:400});
+   const offering=await sql`select id from edu_course_offerings where id=${body.offeringId} limit 1`;
+   if(!offering.length) return NextResponse.json({ok:false,error:'Course offering was not found.'},{status:404});
    if(body.lecturerId){
     const lecturer=await sql`select id from edu_users where id=${body.lecturerId} and role='lecturer' and status='active' limit 1`;
     if(!lecturer.length) return NextResponse.json({ok:false,error:'Selected lecturer is not active.'},{status:400});
    }
    await sql`update edu_course_offerings set lecturer_user_id=${body.lecturerId||null} where id=${body.offeringId}`;
+   await audit(sql,'admin_offering_lecturer_assigned','course_offering',body.offeringId,{lecturerId:body.lecturerId||null});
    return NextResponse.json({ok:true});
   }
   if(body.action==='enrol-student'){
    if(!body.studentId||!body.offeringId) return NextResponse.json({ok:false,error:'Student and course offering are required.'},{status:400});
-   const match=await sql`select 1 from edu_course_offerings o join edu_student_profiles p on p.class_id=o.class_id where o.id=${body.offeringId} and p.user_id=${body.studentId} limit 1`;
-   if(!match.length) return NextResponse.json({ok:false,error:'Assign the student to the offering class before enrolment.'},{status:400});
-   await sql`insert into edu_enrolments (student_user_id,offering_id,status) values (${body.studentId},${body.offeringId},'active') on conflict (student_user_id,offering_id) do update set status='active'`;
+   const student=await sql`select u.id,p.class_id from edu_users u left join edu_student_profiles p on p.user_id=u.id where u.id=${body.studentId} and u.role='student' and u.status='active' limit 1`;
+   if(!student.length) return NextResponse.json({ok:false,error:'Selected student was not found or is not active.'},{status:404});
+   const offering=await sql`select id,class_id from edu_course_offerings where id=${body.offeringId} limit 1`;
+   if(!offering.length) return NextResponse.json({ok:false,error:'Course offering was not found.'},{status:404});
+   if(String(student[0].class_id)!==String(offering[0].class_id)) return NextResponse.json({ok:false,error:'Assign the student to the offering class before enrolment.'},{status:400});
+   const rows=await sql`insert into edu_enrolments (student_user_id,offering_id,status) values (${body.studentId},${body.offeringId},'active') on conflict (student_user_id,offering_id) do update set status='active' returning id`;
+   await audit(sql,'admin_student_enrolled','enrolment',rows?.[0]?.id,{studentId:body.studentId,offeringId:body.offeringId});
    return NextResponse.json({ok:true});
   }
   if(body.action==='bulk-enrol-class'){
@@ -52,15 +60,19 @@ export async function POST(request){
      on conflict (student_user_id,offering_id) do update set status='active'
      returning id
    `;
+   await audit(sql,'admin_class_bulk_enrolled','course_offering',body.offeringId,{classId:body.classId,count:rows.length});
    return NextResponse.json({ok:true,count:rows.length});
   }
   if(body.action==='assign-class'){
    if(!body.studentId) return NextResponse.json({ok:false,error:'Student is required.'},{status:400});
+   const student=await sql`select id from edu_users where id=${body.studentId} and role='student' and status in ('active','inactive','suspended') limit 1`;
+   if(!student.length) return NextResponse.json({ok:false,error:'Selected Education student was not found.'},{status:404});
    if(body.classId){
     const classRows=await sql`select id from edu_classes where id=${body.classId} limit 1`;
     if(!classRows.length) return NextResponse.json({ok:false,error:'Selected class was not found.'},{status:404});
    }
    await sql`insert into edu_student_profiles (user_id,class_id) values (${body.studentId},${body.classId||null}) on conflict (user_id) do update set class_id=excluded.class_id`;
+   await audit(sql,'admin_student_class_assigned','student',body.studentId,{classId:body.classId||null});
    return NextResponse.json({ok:true});
   }
   return NextResponse.json({ok:false,error:'Unknown assignment action.'},{status:400});

@@ -3,6 +3,7 @@ import { isAdmin } from '../../../../../lib/admin-auth';
 import { educationDatabaseIsIsolated, getEducationSql } from '../../../../../lib/db';
 import { ensureEducationAttendanceSchema } from '../../../../../lib/education-attendance';
 import { ensureEducationResultReleaseSchema } from '../../../../../lib/education-results-schema';
+import { ensureEducationGradingSchema } from '../../../../../lib/education-grading';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,7 @@ async function status(sql){
       to_regclass('public.edu_assessment_answers') is not null as assessment_answers,
       to_regclass('public.edu_attendance_sessions') is not null as attendance_sessions,
       to_regclass('public.edu_attendance_records') is not null as attendance_records,
+      to_regclass('public.edu_grading_bands') is not null as grading_bands,
       exists(select 1 from information_schema.columns where table_schema='public' and table_name='edu_assessment_attempts' and column_name='released_at') as release_column
   `;
   const s=rows?.[0]||{};
@@ -34,10 +36,11 @@ async function status(sql){
     assessments:Boolean(s.assessments&&s.assessment_questions&&s.assessment_attempts&&s.assessment_answers),
     attendance:Boolean(s.attendance_sessions&&s.attendance_records),
     resultRelease:Boolean(s.release_column),
+    grading:Boolean(s.grading_bands),
   };
 }
 
-function emptyStatus(){return {foundation:false,materials:false,assessments:false,attendance:false,resultRelease:false};}
+function emptyStatus(){return {foundation:false,materials:false,assessments:false,attendance:false,resultRelease:false,grading:false};}
 function setupState(databaseStatus){return {ok:true,configured:Boolean(process.env.EDUCATION_DATABASE_URL),isolated:educationDatabaseIsIsolated(),status:databaseStatus};}
 
 export async function GET(){
@@ -87,6 +90,7 @@ export async function POST(){
     await sql`create index if not exists edu_assessment_attempts_student_idx on edu_assessment_attempts(student_user_id,assessment_id)`;
     await ensureEducationAttendanceSchema(sql);
     await ensureEducationResultReleaseSchema(sql);
+    await ensureEducationGradingSchema(sql);
     return NextResponse.json(setupState(await status(sql)));
   }catch(error){console.error('Education setup failed:',error);return NextResponse.json({ok:false,configured:true,isolated:true,error:'Education database setup failed. No production database changes were attempted.'},{status:503});}
 }

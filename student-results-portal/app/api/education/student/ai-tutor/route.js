@@ -150,7 +150,8 @@ export async function POST(request) {
     const question=String(body.question||'').trim();
     const topic=String(body.topic||question).trim();
     const offeringId=body.offeringId?Number(body.offeringId):null;
-    const count=[5,10].includes(Number(body.count))?Number(body.count):5;
+    const allowedCounts=[5,10,20,30,50];
+    const count=allowedCounts.includes(Number(body.count))?Number(body.count):5;
     const focus=mode==='answer'?question:topic;
     if(focus.length<3||focus.length>1500) return NextResponse.json({ok:false,error:mode==='answer'?'Enter a question between 3 and 1500 characters.':'Enter a topic between 3 and 1500 characters.'},{status:400});
     if(offeringId&&!Number.isInteger(offeringId)) return NextResponse.json({ok:false,error:'Invalid course scope.'},{status:400});
@@ -168,7 +169,7 @@ export async function POST(request) {
         ? `Return ONLY valid JSON in this exact shape: {"title":"...","questions":[{"question":"...","options":["A","B","C","D"],"correctIndex":0,"explanation":"...","sourceNumbers":[1]}]}. Create exactly ${count} single-best-answer MCQs, exactly four distinct nonblank plausible options each, correctIndex must be an integer from 0 to 3, every explanation must be nonblank and supported by the sources, every question must include at least one valid sourceNumbers value from 1 to ${citations.length}, and do not add unsupported facts.`
         : `Return ONLY valid JSON in this exact shape: {"title":"...","questions":[{"question":"...","answerGuide":"...","sourceNumbers":[1]}]}. Create exactly ${count} written/short-answer revision questions, every question and answerGuide must be nonblank, every question must include at least one valid sourceNumbers value from 1 to ${citations.length}, and all content must be supported by the sources with no unsupported facts.`;
       const gateway=await callGateway([
-        {role:'system',content:'You are the Dropare Education assessment generator. Generate practice questions ONLY from the supplied lecturer-approved materials. Never use general knowledge to fill gaps. Questions are formative revision, not official graded assessments.'},
+        {role:'system',content:'You are the Dropare Education assessment generator. Generate practice questions ONLY from the supplied lecturer-approved materials. Never use general knowledge to fill gaps. Questions are formative revision, not official graded assessments. When a large set is requested, keep each question, option, explanation, and answer guide concise so the complete set fits in one response.'},
         {role:'user',content:`TOPIC OR RECENT LESSON FOCUS:\n${topic}\n\n${format}\n\nAPPROVED MATERIAL:\n${context}`},
       ],0.2);
       if(!gateway.ready) return NextResponse.json({ok:true,supported:true,serviceReady:false,mode,answer:'The approved material is ready for practice generation, but the AI generation service is not enabled on this deployment yet.',questions:[],citations});

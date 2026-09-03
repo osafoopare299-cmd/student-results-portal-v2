@@ -21,6 +21,7 @@ const workspaces = {
       ['Results','Published grades, percentages and assessment breakdowns',BarChart3,'/education/student/results'],
       ['Timetable','Classes, rotations, assessments and deadlines',CalendarDays,'/education/student/timetable'],
       ['AI Tutor','Ask questions from approved course materials only',Sparkles,'/education/student/ai-tutor'],
+      ['Practice Analytics','Track AI practice scores, trends, strong topics and weak areas',Activity,'/education/student/practice-analytics'],
       ['Notifications','Results, assignments, timetable and learning updates',Bell,'/education/student/notifications'],
       ['Attendance','Class and rotation attendance summaries',CheckCircle2,'/education/student/attendance'],
       ['My Profile','View your academic profile, enrolments and contact details',UserRound,'/education/student/profile'],
@@ -83,6 +84,7 @@ export default function Workspace({ role, user=null, dashboard=null }) {
         {learnHref ? <Link href={learnHref}><BookOpen size={18}/> Learning</Link> : <a><BookOpen size={18}/> Learning</a>}
         {assessHref ? <Link href={assessHref}><ClipboardCheck size={18}/> Assessments</Link> : <a><ClipboardCheck size={18}/> Assessments</a>}
         {resultsHref ? <Link href={resultsHref}><BarChart3 size={18}/> Results</Link> : <a><BarChart3 size={18}/> Results</a>}
+        {role==='student' && <Link href="/education/student/practice-analytics"><Activity size={18}/> Practice Analytics</Link>}
         {timetableHref ? <Link href={timetableHref}><CalendarDays size={18}/> Timetable</Link> : <a><CalendarDays size={18}/> Timetable</a>}
         {notificationsHref ? <Link href={notificationsHref}><Bell size={18}/> Notifications</Link> : <a><Bell size={18}/> Notifications</a>}
         {role==='student' && <Link href="/education/student/profile"><UserRound size={18}/> My Profile</Link>}

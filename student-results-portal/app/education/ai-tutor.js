@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, BookOpen, Bot, CheckCircle2, Clock3, FileQuestion, FileText, History, ListChecks, Search, Send, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowLeft, BookOpen, Bot, CheckCircle2, Clock3, FileQuestion, FileText, History, ListChecks, Search, Send, ShieldCheck, Sparkles, Target } from 'lucide-react';
 import styles from './ai-tutor.module.css';
 
 const prompts=['Explain the key points in this topic.','Summarise the approved material for revision.','What are the most important exam points here?'];
@@ -74,9 +74,24 @@ export default function AITutor(){
 
   const courses=useMemo(()=>[...new Map(sources.map(s=>[String(s.offering_id),{id:String(s.offering_id),label:`${s.code} — ${s.course_title}`}])).values()],[sources]);
   const visibleSources=useMemo(()=>course==='all'?sources:sources.filter(s=>String(s.offering_id)===course),[course,sources]);
+  const weakTopics=useMemo(()=>{
+    const grouped=new Map();
+    history.filter(item=>item.mode==='mcq'&&item.percent_score!==null&&item.percent_score!==undefined).forEach(item=>{
+      const topicName=String(item.topic||'').trim();
+      const key=topicName.toLowerCase().replace(/\s+/g,' ');
+      if(!key)return;
+      const current=grouped.get(key)||{topic:topicName,total:0,attempts:0,lastAt:0};
+      current.total+=Number(item.percent_score)||0;
+      current.attempts+=1;
+      current.lastAt=Math.max(current.lastAt,new Date(item.completed_at).getTime()||0);
+      grouped.set(key,current);
+    });
+    return [...grouped.values()].map(item=>({...item,average:item.total/item.attempts})).sort((a,b)=>a.average-b.average||b.lastAt-a.lastAt).slice(0,3);
+  },[history]);
 
-  async function post(payload){
-    const response=await fetch('/api/education/student/ai-tutor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,offeringId:course==='all'?null:Number(course)})});
+  async function post(payload,scopeOverride){
+    const offeringId=scopeOverride===undefined?(course==='all'?null:Number(course)):scopeOverride;
+    const response=await fetch('/api/education/student/ai-tutor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,offeringId})});
     const data=await response.json(); if(!response.ok||!data.ok)throw new Error(data.error||'AI Tutor request failed.'); return data;
   }
 
@@ -96,11 +111,19 @@ export default function AITutor(){
     catch(e){setError(e.message||'AI Tutor request failed.');}finally{setLoading(false);}
   }
 
-  async function generatePractice(type,focus,label){
+  async function generatePractice(type,focus,label,scopeOverride){
     const clean=String(focus||topic).trim(); if(!clean||loading)return; setLoading(true);setError('');setHistoryMsg('');
-    const offeringId=course==='all'?null:Number(course);
-    try{const data=await post({mode:type,topic:clean,count});setMessages(prev=>[...prev,{kind:'practice',q:label||`${type==='mcq'?'MCQs':'Written questions'} on: ${clean}`,set:{mode:type,title:data.title||'Practice questions',questions:data.questions||[],timed,durationMinutes:timed?durationMinutes:null,topic:clean,offeringId},a:data.answer||'',citations:data.citations||[],serviceReady:data.serviceReady!==false}]);}
+    const offeringId=scopeOverride===undefined?(course==='all'?null:Number(course)):scopeOverride;
+    try{const data=await post({mode:type,topic:clean,count},scopeOverride);setMessages(prev=>[...prev,{kind:'practice',q:label||`${type==='mcq'?'MCQs':'Written questions'} on: ${clean}`,set:{mode:type,title:data.title||'Practice questions',questions:data.questions||[],timed,durationMinutes:timed?durationMinutes:null,topic:clean,offeringId},a:data.answer||'',citations:data.citations||[],serviceReady:data.serviceReady!==false}]);}
     catch(e){setError(e.message||'Practice generation failed.');}finally{setLoading(false);}
+  }
+
+  function practiceWeakest(){
+    const weakest=weakTopics[0];
+    if(!weakest||loading)return;
+    setPracticeType('mcq');
+    setTopic(weakest.topic);
+    generatePractice('mcq',weakest.topic,`Adaptive practice — ${weakest.topic}`,null);
   }
 
   const buttonStyle={border:'1px solid #cfe1d8',background:'#eef8f3',color:'#08744d',padding:'9px 11px',borderRadius:10,fontWeight:800,display:'inline-flex',gap:6,alignItems:'center'};
@@ -112,11 +135,12 @@ export default function AITutor(){
         <label>Course scope<select value={course} onChange={e=>setCourse(e.target.value)}><option value="all">All approved courses</option>{courses.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
         <div className={styles.sourceList}>{visibleSources.map(item=><article key={item.id}><span className={styles.fileIcon}><FileText size={18}/></span><div><strong>{item.title}</strong><small>{item.code} · {item.material_type}</small></div><CheckCircle2 size={17}/></article>)}</div>
         <div style={{marginTop:16,padding:14,border:'1px solid #dce9e3',borderRadius:16,background:'#fff'}}><b style={{display:'block',marginBottom:8}}>Create practice on any approved topic</b><textarea value={topic} onChange={e=>setTopic(e.target.value)} rows={3} placeholder="e.g. septic shock, neonatal jaundice, asthma management" style={{width:'100%',boxSizing:'border-box',border:'1px solid #d6e4dd',borderRadius:10,padding:10,resize:'vertical'}}/><div style={{display:'flex',gap:7,marginTop:8,flexWrap:'wrap'}}><button onClick={()=>setPracticeType('mcq')} style={{...buttonStyle,background:practiceType==='mcq'?'#dff4e9':'#eef8f3'}}><ListChecks size={15}/> MCQ</button><button onClick={()=>setPracticeType('written')} style={{...buttonStyle,background:practiceType==='written'?'#dff4e9':'#eef8f3'}}><FileQuestion size={15}/> Written</button><select value={count} onChange={e=>setCount(Number(e.target.value))} style={{border:'1px solid #cfe1d8',borderRadius:10,padding:'9px 10px'}}><option value={5}>5 questions</option><option value={10}>10 questions</option><option value={20}>20 questions</option><option value={30}>30 questions</option><option value={50}>50 questions</option></select></div><div style={{display:'flex',gap:7,marginTop:8,flexWrap:'wrap',alignItems:'center'}}><button onClick={()=>setTimed(v=>!v)} style={{...buttonStyle,background:timed?'#dff4e9':'#eef8f3'}}><Clock3 size={15}/>{timed?'Timed mode on':'Use countdown timer'}</button>{timed&&<select value={durationMinutes} onChange={e=>setDurationMinutes(Number(e.target.value))} style={{border:'1px solid #cfe1d8',borderRadius:10,padding:'9px 10px'}}><option value={5}>5 minutes</option><option value={10}>10 minutes</option><option value={15}>15 minutes</option><option value={20}>20 minutes</option><option value={30}>30 minutes</option><option value={45}>45 minutes</option><option value={60}>60 minutes</option><option value={90}>90 minutes</option><option value={120}>120 minutes</option></select>}<button disabled={!topic.trim()||loading||!sources.length} onClick={()=>generatePractice(practiceType,topic)} style={{...buttonStyle,background:'#08744d',color:'#fff'}}>Generate now</button></div></div>
+        <div style={{marginTop:16,padding:14,border:'1px solid #cfe1d8',borderRadius:16,background:'#f8fcfa'}}><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}><Target size={18}/><b>Adaptive practice</b></div>{weakTopics.length?<><small style={{display:'block',color:'#60786e',lineHeight:1.45,marginBottom:9}}>Based on your completed MCQ scores. Lowest-scoring topics are prioritised.</small><div style={{display:'grid',gap:7,marginBottom:10}}>{weakTopics.map((item,index)=><div key={item.topic} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'8px 9px',borderRadius:10,background:'#fff'}}><div><b style={{fontSize:13}}>{index===0?'Focus first: ':''}{item.topic}</b><small style={{display:'block',marginTop:2,color:'#789087'}}>{item.attempts} attempt{item.attempts===1?'':'s'}</small></div><b style={{fontSize:13,color:item.average<70?'#b42318':'#08744d'}}>{Math.round(item.average)}%</b></div>)}</div><button disabled={loading||!sources.length} onClick={practiceWeakest} style={{...buttonStyle,width:'100%',justifyContent:'center',background:'#08744d',color:'#fff'}}><Target size={15}/> Practice my weak areas</button></>:<small style={{color:'#70857c',lineHeight:1.45}}>Complete at least one MCQ practice set and your weakest topics will appear here automatically.</small>}</div>
         <div style={{marginTop:16,padding:14,border:'1px solid #dce9e3',borderRadius:16,background:'#fff'}}><div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}><History size={18}/><b>Recent practice</b></div>{history.length?<div style={{display:'grid',gap:8}}>{history.slice(0,6).map(item=><div key={item.id} style={{padding:'9px 10px',borderRadius:11,background:'#f5faf7'}}><div style={{display:'flex',justifyContent:'space-between',gap:8}}><b style={{fontSize:13}}>{item.mode==='mcq'?'MCQ':'Written'} • {item.question_count} Q</b>{item.percent_score!==null&&item.percent_score!==undefined?<b style={{fontSize:13,color:'#08744d'}}>{Math.round(Number(item.percent_score))}%</b>:<small>Completed</small>}</div><small style={{display:'block',marginTop:3,color:'#60786e'}}>{item.topic}</small><small style={{display:'block',marginTop:3,color:'#789087'}}>{item.timed?`${item.duration_minutes} min timed • `:''}{new Date(item.completed_at).toLocaleDateString()}</small></div>)}</div>:<small style={{color:'#70857c'}}>Completed AI practice sessions will appear here.</small>}{historyMsg&&<small style={{display:'block',marginTop:9,color:'#08744d',fontWeight:800}}>{historyMsg}</small>}</div>
         <div className={styles.rule}><ShieldCheck size={18}/><p><b>No unsupported questions.</b> Practice is generated only from published, lecturer-approved material in your active courses.</p></div>
       </aside>
       <section className={styles.chat}><div className={styles.chatHead}><Bot size={22}/><div><b>Dropare AI Tutor</b><small>Student learning assistant</small></div></div>
-        <div className={styles.chatBody}>{error&&<div className={styles.rule}><p>{error}</p></div>}{messages.length===0?<div className={styles.empty}><span><Bot size={30}/></span><h2>Learn, then test yourself</h2><p>{sources.length?'Ask a lesson question, or use the topic practice builder to create up to 50 MCQs or written questions, with optional countdown timing.':'No AI-approved course material is available for your enrolments yet.'}</p><div className={styles.prompts}>{prompts.map(item=><button key={item} disabled={!sources.length||loading} onClick={()=>ask(item)}><Search size={15}/>{item}</button>)}</div></div>:messages.map((item,index)=><div className={styles.exchange} key={`${item.q}-${index}`}><div className={styles.userBubble}><b>You</b><p>{item.q}</p></div><div className={styles.aiBubble}><b><Bot size={16}/> AI Tutor</b>{item.a&&<p>{item.a}</p>}{item.kind==='answer'&&item.serviceReady&&<div style={{display:'flex',gap:7,flexWrap:'wrap',marginTop:10}}><button style={buttonStyle} disabled={loading} onClick={()=>generatePractice('mcq',item.q,'Quiz me on what I just learned — MCQs')}><ListChecks size={15}/> Quiz me with MCQs</button><button style={buttonStyle} disabled={loading} onClick={()=>generatePractice('written',item.q,'Quiz me on what I just learned — Written')}><FileQuestion size={15}/> Written questions</button></div>}{item.kind==='practice'&&item.set?.questions?.length>0&&<PracticeSet set={item.set} onComplete={savePractice}/>} {item.citations.length>0&&<small><ShieldCheck size={14}/> Sources: {item.citations.map(c=>`${c.courseCode} — ${c.title}`).join(' · ')}</small>}</div></div>)}</div>
+        <div className={styles.chatBody}>{error&&<div className={styles.rule}><p>{error}</p></div>}{messages.length===0?<div className={styles.empty}><span><Bot size={30}/></span><h2>Learn, then test yourself</h2><p>{sources.length?'Ask a lesson question, generate up to 50 questions, or let adaptive practice target your weaker MCQ topics.':'No AI-approved course material is available for your enrolments yet.'}</p><div className={styles.prompts}>{prompts.map(item=><button key={item} disabled={!sources.length||loading} onClick={()=>ask(item)}><Search size={15}/>{item}</button>)}</div></div>:messages.map((item,index)=><div className={styles.exchange} key={`${item.q}-${index}`}><div className={styles.userBubble}><b>You</b><p>{item.q}</p></div><div className={styles.aiBubble}><b><Bot size={16}/> AI Tutor</b>{item.a&&<p>{item.a}</p>}{item.kind==='answer'&&item.serviceReady&&<div style={{display:'flex',gap:7,flexWrap:'wrap',marginTop:10}}><button style={buttonStyle} disabled={loading} onClick={()=>generatePractice('mcq',item.q,'Quiz me on what I just learned — MCQs')}><ListChecks size={15}/> Quiz me with MCQs</button><button style={buttonStyle} disabled={loading} onClick={()=>generatePractice('written',item.q,'Quiz me on what I just learned — Written')}><FileQuestion size={15}/> Written questions</button></div>}{item.kind==='practice'&&item.set?.questions?.length>0&&<PracticeSet set={item.set} onComplete={savePractice}/>} {item.citations.length>0&&<small><ShieldCheck size={14}/> Sources: {item.citations.map(c=>`${c.courseCode} — ${c.title}`).join(' · ')}</small>}</div></div>)}</div>
         <div className={styles.composer}><textarea value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ask();}}} placeholder="Ask a question from approved course materials…" rows={2}/><button disabled={loading||!sources.length} onClick={()=>ask()} aria-label="Ask AI Tutor"><Send size={19}/></button></div>
       </section>
     </section>

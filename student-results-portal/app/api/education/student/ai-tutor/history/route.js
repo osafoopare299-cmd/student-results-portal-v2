@@ -20,9 +20,11 @@ async function ensureHistorySchema(sql){
       duration_minutes integer null,
       elapsed_seconds integer null,
       completion_reason text not null default 'submitted' check (completion_reason in ('submitted','time_expired')),
+      difficulty text not null default 'standard',
       completed_at timestamptz not null default now()
     )
   `;
+  await sql`alter table edu_ai_practice_history add column if not exists difficulty text not null default 'standard'`;
   await sql`create index if not exists edu_ai_practice_history_student_completed_idx on edu_ai_practice_history(student_user_id, completed_at desc)`;
 }
 
@@ -34,7 +36,7 @@ export async function GET(){
     await ensureHistorySchema(sql);
     const history=await sql`
       select h.id,h.mode,h.topic,h.question_count,h.answered_count,h.correct_count,h.percent_score,
-             h.timed,h.duration_minutes,h.elapsed_seconds,h.completion_reason,h.completed_at,
+             h.timed,h.duration_minutes,h.elapsed_seconds,h.completion_reason,h.difficulty,h.completed_at,
              c.code as course_code,c.title as course_title
       from edu_ai_practice_history h
       left join edu_course_offerings o on o.id=h.offering_id
@@ -66,6 +68,7 @@ export async function POST(request){
     const elapsedSeconds=Math.max(0,Number(body.elapsedSeconds)||0);
     const completionReason=body.completionReason==='time_expired'?'time_expired':'submitted';
     const offeringId=body.offeringId?Number(body.offeringId):null;
+    const difficulty=['foundation','standard','challenge'].includes(body.difficulty)?body.difficulty:'standard';
 
     if(!mode||!topic||!Number.isInteger(questionCount)||questionCount<1||questionCount>50){
       return NextResponse.json({ok:false,error:'Invalid practice history payload.'},{status:400});
@@ -82,13 +85,13 @@ export async function POST(request){
     const rows=await sql`
       insert into edu_ai_practice_history(
         student_user_id,offering_id,mode,topic,question_count,answered_count,correct_count,percent_score,
-        timed,duration_minutes,elapsed_seconds,completion_reason
+        timed,duration_minutes,elapsed_seconds,completion_reason,difficulty
       ) values(
         ${access.user.id},${offeringId},${mode},${topic},${questionCount},${answeredCount},${correctCount},${percentScore},
-        ${timed},${durationMinutes},${elapsedSeconds},${completionReason}
+        ${timed},${durationMinutes},${elapsedSeconds},${completionReason},${difficulty}
       ) returning id,completed_at
     `;
-    await sql`insert into edu_audit_logs(actor_user_id,action,entity_type,entity_id,metadata) values(${access.user.id},'ai_tutor_practice_completed','student',${access.user.id},${JSON.stringify({mode,topic:topic.slice(0,200),questionCount,answeredCount,correctCount,percentScore,timed,durationMinutes,elapsedSeconds,completionReason,offeringId})}::jsonb)`;
+    await sql`insert into edu_audit_logs(actor_user_id,action,entity_type,entity_id,metadata) values(${access.user.id},'ai_tutor_practice_completed','student',${access.user.id},${JSON.stringify({mode,topic:topic.slice(0,200),questionCount,answeredCount,correctCount,percentScore,timed,durationMinutes,elapsedSeconds,completionReason,offeringId,difficulty})}::jsonb)`;
     return NextResponse.json({ok:true,record:rows[0]});
   }catch(error){
     console.error('AI Tutor practice history save failed:',error);

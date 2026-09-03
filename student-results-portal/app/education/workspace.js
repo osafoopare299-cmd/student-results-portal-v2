@@ -5,7 +5,7 @@ import { useState } from 'react';
 import {
   Activity, BarChart3, Bell, BookOpen, CalendarDays, CheckCircle2,
   ClipboardCheck, FileText, GraduationCap, LayoutDashboard, Menu,
-  MessageSquareText, ShieldCheck, Sparkles, Stethoscope, UserCog,
+  MessageSquareText, ShieldCheck, Sparkles, Stethoscope, UserCog, UserRound,
   Wifi, X
 } from 'lucide-react';
 import styles from './page.module.css';
@@ -23,6 +23,7 @@ const workspaces = {
       ['AI Tutor','Ask questions from approved course materials only',Sparkles,'/education/student/ai-tutor'],
       ['Notifications','Results, assignments, timetable and learning updates',Bell,'/education/student/notifications'],
       ['Attendance','Class and rotation attendance summaries',CheckCircle2,'/education/student/attendance'],
+      ['My Profile','View your academic profile, enrolments and contact details',UserRound,'/education/student/profile'],
     ],
   },
   lecturer: {
@@ -84,6 +85,7 @@ export default function Workspace({ role, user=null, dashboard=null }) {
         {resultsHref ? <Link href={resultsHref}><BarChart3 size={18}/> Results</Link> : <a><BarChart3 size={18}/> Results</a>}
         {timetableHref ? <Link href={timetableHref}><CalendarDays size={18}/> Timetable</Link> : <a><CalendarDays size={18}/> Timetable</a>}
         {notificationsHref ? <Link href={notificationsHref}><Bell size={18}/> Notifications</Link> : <a><Bell size={18}/> Notifications</a>}
+        {role==='student' && <Link href="/education/student/profile"><UserRound size={18}/> My Profile</Link>}
       </nav>
       <div className={styles.sidebarFoot}><ShieldCheck size={18}/><span>Authenticated role access enforced</span></div>
     </aside>
@@ -100,7 +102,7 @@ export default function Workspace({ role, user=null, dashboard=null }) {
         <section className={styles.featureGrid}>{data.actions.map(item=><ToolCard key={item[0]} item={item}/>)}</section>
         <section className={styles.foundation}><ShieldCheck size={20}/><div><b>{dashboard ? 'Database-backed workspace' : 'Secure education foundation'}</b><p>{dashboard ? 'Dashboard totals are now loaded from education records. Existing student results publication remains separate and unchanged.' : 'Role access is protected. Live academic data will appear once the education database and authentication environment are activated.'}</p></div></section>
       </div>
-      {role==='student' && <nav className={styles.mobileNav}><Link className={styles.active} href="/education/student"><LayoutDashboard/><span>Home</span></Link><Link href="/education/student/learn"><BookOpen/><span>Learn</span></Link><Link href="/education/student/assess"><ClipboardCheck/><span>Assess</span></Link><Link href="/education/student/results"><BarChart3/><span>Results</span></Link><Link href="/education/student/notifications"><Bell/><span>More</span></Link></nav>}
+      {role==='student' && <nav className={styles.mobileNav}><Link className={styles.active} href="/education/student"><LayoutDashboard/><span>Home</span></Link><Link href="/education/student/learn"><BookOpen/><span>Learn</span></Link><Link href="/education/student/assess"><ClipboardCheck/><span>Assess</span></Link><Link href="/education/student/results"><BarChart3/><span>Results</span></Link><Link href="/education/student/profile"><UserRound/><span>More</span></Link></nav>}
     </section>
   </main>;
 }

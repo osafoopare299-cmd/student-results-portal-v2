@@ -21,6 +21,51 @@ function extractJson(text){
   return null;
 }
 
+function cleanSourceNumbers(value,maxSource){
+  if(!Array.isArray(value)) return null;
+  const numbers=[...new Set(value.map(Number).filter(n=>Number.isInteger(n)&&n>=1&&n<=maxSource))];
+  return numbers.length?numbers:null;
+}
+
+function validatePracticeSet(parsed,mode,count,maxSource){
+  if(!parsed||!Array.isArray(parsed.questions)||parsed.questions.length!==count){
+    return {ok:false,error:`AI Tutor must return exactly ${count} questions.`};
+  }
+
+  const normalized=[];
+  for(let i=0;i<parsed.questions.length;i++){
+    const raw=parsed.questions[i]||{};
+    const question=String(raw.question||'').trim();
+    const sourceNumbers=cleanSourceNumbers(raw.sourceNumbers,maxSource);
+    if(!question) return {ok:false,error:`Question ${i+1} is blank.`};
+    if(!sourceNumbers) return {ok:false,error:`Question ${i+1} has no valid approved source reference.`};
+
+    if(mode==='mcq'){
+      if(!Array.isArray(raw.options)||raw.options.length!==4){
+        return {ok:false,error:`Question ${i+1} must contain exactly four options.`};
+      }
+      const options=raw.options.map(option=>String(option||'').trim());
+      if(options.some(option=>!option)) return {ok:false,error:`Question ${i+1} contains a blank option.`};
+      if(new Set(options.map(option=>option.toLowerCase())).size!==4){
+        return {ok:false,error:`Question ${i+1} contains duplicate options.`};
+      }
+      if(!Number.isInteger(raw.correctIndex)||raw.correctIndex<0||raw.correctIndex>3){
+        return {ok:false,error:`Question ${i+1} has an invalid correct answer index.`};
+      }
+      const explanation=String(raw.explanation||'').trim();
+      if(!explanation) return {ok:false,error:`Question ${i+1} has no explanation.`};
+      normalized.push({id:i+1,question,options,correctIndex:raw.correctIndex,explanation,sourceNumbers});
+      continue;
+    }
+
+    const answerGuide=String(raw.answerGuide||'').trim();
+    if(!answerGuide) return {ok:false,error:`Question ${i+1} has no answer guide.`};
+    normalized.push({id:i+1,question,answerGuide,sourceNumbers});
+  }
+
+  return {ok:true,questions:normalized};
+}
+
 async function loadApprovedMaterials(sql,userId,offeringId){
   return sql`
     select m.id,m.offering_id,m.title,m.material_type,m.description,m.content_text,
@@ -120,8 +165,8 @@ export async function POST(request) {
 
     if(mode==='mcq'||mode==='written'){
       const format=mode==='mcq'
-        ? `Return ONLY valid JSON in this exact shape: {"title":"...","questions":[{"question":"...","options":["A","B","C","D"],"correctIndex":0,"explanation":"...","sourceNumbers":[1]}]}. Create exactly ${count} single-best-answer MCQs, exactly four plausible options each, correctIndex 0-3, explanations supported by the sources, and no unsupported facts.`
-        : `Return ONLY valid JSON in this exact shape: {"title":"...","questions":[{"question":"...","answerGuide":"...","sourceNumbers":[1]}]}. Create exactly ${count} written/short-answer revision questions with concise marking/answer guides supported by the sources and no unsupported facts.`;
+        ? `Return ONLY valid JSON in this exact shape: {"title":"...","questions":[{"question":"...","options":["A","B","C","D"],"correctIndex":0,"explanation":"...","sourceNumbers":[1]}]}. Create exactly ${count} single-best-answer MCQs, exactly four distinct nonblank plausible options each, correctIndex must be an integer from 0 to 3, every explanation must be nonblank and supported by the sources, every question must include at least one valid sourceNumbers value from 1 to ${citations.length}, and do not add unsupported facts.`
+        : `Return ONLY valid JSON in this exact shape: {"title":"...","questions":[{"question":"...","answerGuide":"...","sourceNumbers":[1]}]}. Create exactly ${count} written/short-answer revision questions, every question and answerGuide must be nonblank, every question must include at least one valid sourceNumbers value from 1 to ${citations.length}, and all content must be supported by the sources with no unsupported facts.`;
       const gateway=await callGateway([
         {role:'system',content:'You are the Dropare Education assessment generator. Generate practice questions ONLY from the supplied lecturer-approved materials. Never use general knowledge to fill gaps. Questions are formative revision, not official graded assessments.'},
         {role:'user',content:`TOPIC OR RECENT LESSON FOCUS:\n${topic}\n\n${format}\n\nAPPROVED MATERIAL:\n${context}`},
@@ -129,11 +174,14 @@ export async function POST(request) {
       if(!gateway.ready) return NextResponse.json({ok:true,supported:true,serviceReady:false,mode,answer:'The approved material is ready for practice generation, but the AI generation service is not enabled on this deployment yet.',questions:[],citations});
       const parsed=extractJson(gateway.text);
       if(!parsed||!Array.isArray(parsed.questions)) return NextResponse.json({ok:false,error:'AI Tutor could not format the practice set. Please try again.'},{status:503});
-      const questions=parsed.questions.slice(0,count).map((q,i)=>mode==='mcq'?{
-        id:i+1,question:String(q.question||''),options:Array.isArray(q.options)?q.options.slice(0,4).map(String):[],correctIndex:Number.isInteger(q.correctIndex)?q.correctIndex:null,explanation:String(q.explanation||''),sourceNumbers:Array.isArray(q.sourceNumbers)?q.sourceNumbers:[]
-      }:{id:i+1,question:String(q.question||''),answerGuide:String(q.answerGuide||''),sourceNumbers:Array.isArray(q.sourceNumbers)?q.sourceNumbers:[]});
+      const validation=validatePracticeSet(parsed,mode,count,citations.length);
+      if(!validation.ok){
+        console.error('AI Tutor practice validation failed:',validation.error);
+        return NextResponse.json({ok:false,error:'AI Tutor produced an invalid practice set. Please try again.'},{status:503});
+      }
+      const title=String(parsed.title||'').trim()||`${mode==='mcq'?'MCQ':'Written'} practice`;
       await sql`insert into edu_audit_logs(actor_user_id,action,entity_type,entity_id,metadata) values(${access.user.id},'ai_tutor_practice_generated','student',${access.user.id},${JSON.stringify({mode,count,offeringId,topic:topic.slice(0,200),sourceIds:citations.map(c=>c.id)})}::jsonb)`;
-      return NextResponse.json({ok:true,supported:true,serviceReady:true,mode,title:String(parsed.title||`${mode==='mcq'?'MCQ':'Written'} practice`),questions,citations});
+      return NextResponse.json({ok:true,supported:true,serviceReady:true,mode,title,questions:validation.questions,citations});
     }
 
     const gateway=await callGateway([

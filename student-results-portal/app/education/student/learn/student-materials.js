@@ -5,11 +5,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, BookOpen, Download, FileText, Search, Sparkles, Video, ExternalLink, CheckCircle2 } from 'lucide-react';
 
 const iconFor={note:BookOpen,pdf:FileText,video:Video,link:ExternalLink};
-const STORAGE_KEY='dropare-education-offline-materials-v1';
-const RESOURCE_CACHE='dropare-education-resources-v1';
+const LEGACY_STORAGE_KEY='dropare-education-offline-materials-v1';
 
-function readSaved(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');}catch{return [];}}
-function writeSaved(items){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(items));}catch{}}
+function safeUserPart(value){return String(value||'').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,120);}
+function storageKey(userId){return `dropare-education-offline-materials-v2-${safeUserPart(userId)}`;}
+function resourceCache(userId){return `dropare-education-resources-v2-${safeUserPart(userId)}`;}
+function readSaved(userId){if(!userId)return[];try{return JSON.parse(localStorage.getItem(storageKey(userId))||'[]');}catch{return [];}}
+function writeSaved(userId,items){if(!userId)return;try{localStorage.setItem(storageKey(userId),JSON.stringify(items));}catch{}}
 function resourceHref(m){return m.file_url||m.resource_url||null;}
 
 export default function StudentMaterials(){
@@ -18,36 +20,65 @@ export default function StudentMaterials(){
   const [course,setCourse]=useState('all');
   const [offlineOnly,setOfflineOnly]=useState(false);
   const [savedIds,setSavedIds]=useState([]);
+  const [userId,setUserId]=useState(null);
   const [msg,setMsg]=useState('Loading your learning materials…');
 
   useEffect(()=>{
-    const saved=readSaved(); setSavedIds(saved.map(x=>String(x.id)));
-    (async()=>{try{const r=await fetch('/api/education/student/materials',{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to load materials.');setData(d);setMsg('');}catch(e){
-      if(saved.length){
-        const offeringMap=new Map(); saved.forEach(m=>{if(!offeringMap.has(String(m.offering_id)))offeringMap.set(String(m.offering_id),{id:m.offering_id,code:m.code,title:m.course_title,materials_count:0,offline_count:0,ai_count:0});const o=offeringMap.get(String(m.offering_id));o.materials_count++;o.offline_count++;if(m.is_ai_approved)o.ai_count++;});
-        setData({offerings:[...offeringMap.values()],materials:saved}); setMsg('Offline mode: showing materials previously saved on this device.');
-      } else setMsg(e.message||'Unable to load materials.');
-    }})();
+    (async()=>{
+      try{
+        const meResponse=await fetch('/api/education/me',{cache:'no-store',credentials:'include'});
+        const me=await meResponse.json();
+        if(!meResponse.ok||!me?.user?.id)throw new Error(me.error||'Unable to verify your Education account.');
+        const uid=String(me.user.id);
+        setUserId(uid);
+        // Remove the old shared-browser metadata key rather than risking cross-user exposure.
+        try{localStorage.removeItem(LEGACY_STORAGE_KEY);}catch{}
+        const saved=readSaved(uid);
+        setSavedIds(saved.map(x=>String(x.id)));
+        try{
+          const r=await fetch('/api/education/student/materials',{cache:'no-store',credentials:'include'});
+          const d=await r.json();
+          if(!r.ok)throw new Error(d.error||'Unable to load materials.');
+          setData(d);setMsg('');
+        }catch(e){
+          if(saved.length){
+            const offeringMap=new Map();
+            saved.forEach(m=>{if(!offeringMap.has(String(m.offering_id)))offeringMap.set(String(m.offering_id),{id:m.offering_id,code:m.code,title:m.course_title,materials_count:0,offline_count:0,ai_count:0});const o=offeringMap.get(String(m.offering_id));o.materials_count++;o.offline_count++;if(m.is_ai_approved)o.ai_count++;});
+            setData({offerings:[...offeringMap.values()],materials:saved});
+            setMsg('Offline mode: showing materials saved for this signed-in Education account on this device.');
+          } else setMsg(e.message||'Unable to load materials.');
+        }
+      }catch(e){
+        setData({offerings:[],materials:[]});
+        setSavedIds([]);
+        setMsg(e.message||'Unable to verify your Education account. Stored offline materials are hidden until your account can be verified.');
+      }
+    })();
   },[]);
 
   async function saveOffline(material){
+    if(!userId){setMsg('Your Education account must be verified before saving offline materials.');return;}
     if(!material.is_offline_available){setMsg('This resource has not been approved by the lecturer for offline access.');return;}
     const href=resourceHref(material);
-    const existing=readSaved().filter(x=>String(x.id)!==String(material.id));
-    const saved={...material,saved_at:new Date().toISOString()}; writeSaved([saved,...existing]); setSavedIds(ids=>[...new Set([...ids,String(material.id)])]);
+    const existing=readSaved(userId).filter(x=>String(x.id)!==String(material.id));
+    const saved={...material,saved_at:new Date().toISOString()};
+    writeSaved(userId,[saved,...existing]);
+    setSavedIds(ids=>[...new Set([...ids,String(material.id)])]);
     let resourceCached=false;
     if(href&&'caches' in window){
       try{
-        const response=await fetch(href,{credentials:material.has_uploaded_file?'include':'omit'});
-        if(response.ok){const cache=await caches.open(RESOURCE_CACHE);await cache.put(href,response.clone());resourceCached=true;}
+        const response=await fetch(href,{credentials:material.has_uploaded_file?'include':'omit',cache:'no-store'});
+        if(response.ok){const cache=await caches.open(resourceCache(userId));await cache.put(href,response.clone());resourceCached=true;}
       }catch{}
     }
     setMsg(resourceCached?'Saved for offline use, including the resource file.':'Saved for offline use. Note text and material details are available offline; some external files may still require internet access.');
   }
 
   function removeOffline(material){
-    const next=readSaved().filter(x=>String(x.id)!==String(material.id)); writeSaved(next); setSavedIds(next.map(x=>String(x.id))); setMsg('Removed from offline saved materials.');
-    const href=resourceHref(material);if(href&&'caches' in window)caches.open(RESOURCE_CACHE).then(cache=>cache.delete(href)).catch(()=>{});
+    if(!userId)return;
+    const next=readSaved(userId).filter(x=>String(x.id)!==String(material.id));
+    writeSaved(userId,next);setSavedIds(next.map(x=>String(x.id)));setMsg('Removed from offline saved materials.');
+    const href=resourceHref(material);if(href&&'caches' in window)caches.open(resourceCache(userId)).then(cache=>cache.delete(href)).catch(()=>{});
   }
 
   const materials=useMemo(()=>data.materials.filter(m=>{

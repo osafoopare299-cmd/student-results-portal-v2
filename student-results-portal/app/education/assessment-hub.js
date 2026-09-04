@@ -1,0 +1,38 @@
+'use client';
+
+import Link from 'next/link';
+import { useEffect,useMemo,useState } from 'react';
+import { ArrowLeft,CheckCircle2,ChevronRight,CircleDot,ClipboardCheck,Clock3,FilePenLine,GraduationCap,Plus,Stethoscope,TimerReset } from 'lucide-react';
+import styles from './assessment.module.css';
+
+const TYPES=['All','MCQ','Written','OSCE','Viva','Practical'];
+const pretty=v=>v?String(v).charAt(0).toUpperCase()+String(v).slice(1):'';
+const when=v=>v?new Date(v).toLocaleString([], {dateStyle:'medium',timeStyle:'short'}):'No deadline';
+const blankForm={offeringId:'',title:'',description:'',assessmentType:'mcq',maxScore:'100',durationMinutes:'',opensAt:'',closesAt:'',instructions:''};
+
+export default function AssessmentHub({mode='student'}){
+  const lecturer=mode==='lecturer';
+  const [filter,setFilter]=useState('All'),[data,setData]=useState({assessments:[],offerings:[]}),[loading,setLoading]=useState(true),[message,setMessage]=useState(''),[showForm,setShowForm]=useState(false),[saving,setSaving]=useState(false);
+  const [form,setForm]=useState(blankForm);
+  const endpoint=lecturer?'/api/education/lecturer/assessments':'/api/education/student/assessments';
+  async function load(){setLoading(true);setMessage('');try{const r=await fetch(endpoint,{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to load assessments.');setData(d);}catch(e){setMessage(e.message||'Unable to load assessments.');}finally{setLoading(false);}}
+  useEffect(()=>{load();},[endpoint]);
+  const shown=useMemo(()=>filter==='All'?data.assessments:(data.assessments||[]).filter(x=>String(x.assessment_type).toLowerCase()===filter.toLowerCase()),[data.assessments,filter]);
+  async function createAssessment(e){e.preventDefault();setSaving(true);setMessage('');try{const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(form)});const d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to save assessment.');setForm(blankForm);setShowForm(false);setMessage('Assessment draft created. Add questions in the builder, then publish after validation.');await load();}catch(e2){setMessage(e2.message||'Unable to save assessment.');}finally{setSaving(false);}}
+  const openCount=(data.assessments||[]).filter(x=>(x.availability||x.status)==='Open'||x.status==='published').length;
+  return <main className={styles.page}>
+    <header className={styles.topbar}><Link href={lecturer?'/education/lecturer':'/education/student'}><ArrowLeft size={18}/> Dashboard</Link><div><ClipboardCheck size={19}/><b>Assessment Hub</b></div><span>Live</span></header>
+    <div className={styles.inner}>
+      <section className={styles.hero}><div><small>DROPARE EDUCATION</small><h1>{lecturer?'Assessment Management':'Assessments'}</h1><p>{lecturer?'Create and schedule assessments for courses assigned to you.':'Only assessments from your active course enrolments appear here.'}</p></div><div className={styles.heroCard}><GraduationCap size={22}/><span>{lecturer?'Assessments':'Open assessments'}</span><strong>{lecturer?(data.assessments||[]).length:openCount}</strong></div></section>
+      {lecturer&&<section className={styles.actions}><button onClick={()=>setShowForm(v=>!v)}><Plus size={17}/>{showForm?'Close creator':'Create assessment'}</button></section>}
+      {lecturer&&showForm&&<form className={styles.creator} onSubmit={createAssessment}>
+        <div className={styles.formGrid}><label>Course offering<select value={form.offeringId} onChange={e=>setForm({...form,offeringId:e.target.value})} required><option value="">Select course</option>{(data.offerings||[]).map(o=><option key={o.id} value={o.id}>{o.code} — {o.title} ({o.class_name})</option>)}</select></label><label>Assessment type<select value={form.assessmentType} onChange={e=>setForm({...form,assessmentType:e.target.value})}>{TYPES.slice(1).map(t=><option key={t} value={t.toLowerCase()}>{t}</option>)}</select></label><label className={styles.wide}>Title<input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} required maxLength={240}/></label><label>Maximum score<input type="number" min="0.01" step="0.01" value={form.maxScore} onChange={e=>setForm({...form,maxScore:e.target.value})} required/></label><label>Duration (minutes)<input type="number" min="1" step="1" value={form.durationMinutes} onChange={e=>setForm({...form,durationMinutes:e.target.value})}/></label><label>Opens<input type="datetime-local" value={form.opensAt} onChange={e=>setForm({...form,opensAt:e.target.value})}/></label><label>Closes<input type="datetime-local" value={form.closesAt} onChange={e=>setForm({...form,closesAt:e.target.value})}/></label><label className={styles.wide}>Description<textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows="3"/></label><label className={styles.wide}>Instructions<textarea value={form.instructions} onChange={e=>setForm({...form,instructions:e.target.value})} rows="3"/></label></div><div className={styles.formFooter}><span style={{fontSize:13,color:'#667d74'}}>New assessments are saved as drafts. Add questions and verify marks before publishing.</span><button disabled={saving}>{saving?'Saving…':'Create draft'}</button></div>
+      </form>}
+      {message&&<div className={styles.message}>{message}</div>}
+      <section className={styles.filters}>{TYPES.map(item=><button key={item} className={filter===item?styles.active:''} onClick={()=>setFilter(item)}>{item}</button>)}</section>
+      {loading?<section className={styles.empty}>Loading assessments…</section>:shown.length===0?<section className={styles.empty}>{lecturer?'No assessments yet. Create the first one after a course is assigned to you.':'No assessments are available for your enrolled courses yet.'}</section>:<section className={styles.grid}>{shown.map(item=>{const status=item.availability||pretty(item.status);const href=lecturer?`/education/lecturer/assessments/${item.id}`:`/education/student/assessments/${item.id}`;return <article key={item.id}><div className={styles.cardTop}><span className={styles.type}>{pretty(item.assessment_type)}</span><span className={status==='Open'||status==='Published'?styles.open:styles.scheduled}>{status}</span></div><h2>{item.title}</h2><p>{item.code} · {item.course_title}{item.class_name?` · ${item.class_name}`:''}</p><div className={styles.meta}><span><Clock3 size={15}/>{item.closes_at?`Due ${when(item.closes_at)}`:item.opens_at?`Opens ${when(item.opens_at)}`:'No schedule set'}</span><span><CircleDot size={15}/>{item.question_count||0} questions · {Number(item.max_score)} marks</span>{lecturer&&<span><ClipboardCheck size={15}/>{item.submission_count||0} submitted</span>}</div>{lecturer||status==='Open'?<Link className={styles.cardAction} href={href}>{lecturer?'Manage assessment':'Open assessment'}<ChevronRight size={17}/></Link>:<button disabled>View details<ChevronRight size={17}/></button>}</article>})}</section>}
+      <section className={styles.summary}><div><FilePenLine size={19}/><span><b>MCQ + Written</b><small>Configurable score maxima, timing and publication state.</small></span></div><div><Stethoscope size={19}/><span><b>Viva / OSCE / Practical</b><small>Structured clinical assessment types use the same secure course model.</small></span></div><div><TimerReset size={19}/><span><b>Private by default</b><small>Draft assessments are invisible to students until published.</small></span></div></section>
+      <section className={styles.note}><CheckCircle2 size={19}/><p><b>Results system preserved.</b> Education assessments use separate <code>edu_*</code> tables and do not alter the existing published-results workflow.</p></section>
+    </div>
+  </main>;
+}

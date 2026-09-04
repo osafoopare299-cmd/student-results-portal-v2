@@ -1,6 +1,21 @@
 'use client';
 import { useEffect, useState } from 'react';
 
+async function clearPrivateEducationData(){
+  try{
+    if('caches' in window){
+      const names=await caches.keys();
+      await Promise.all(names.filter(name=>name.startsWith('dropare-education-resources-v2-')).map(name=>caches.delete(name)));
+    }
+  }catch{}
+  try{
+    for(let i=localStorage.length-1;i>=0;i--){
+      const key=localStorage.key(i);
+      if(key?.startsWith('dropare-education-offline-materials-v2-')||key==='dropare-education-offline-materials-v1')localStorage.removeItem(key);
+    }
+  }catch{}
+}
+
 export default function PWARegister(){
   const [installEvent,setInstallEvent]=useState(null);
   const [visible,setVisible]=useState(false);
@@ -11,6 +26,10 @@ export default function PWARegister(){
       const register=()=>navigator.serviceWorker.register('/education-sw.js',{scope:'/education/'}).catch(()=>{});
       if(document.readyState==='complete')register(); else window.addEventListener('load',register,{once:true});
     }
+
+    fetch('/api/education/me',{cache:'no-store',credentials:'include'})
+      .then(response=>{if(response.status===401||response.status===403)return clearPrivateEducationData();})
+      .catch(()=>{});
 
     const standalone=window.matchMedia?.('(display-mode: standalone)')?.matches||window.navigator.standalone===true;
     if(standalone){setInstalled(true);return;}

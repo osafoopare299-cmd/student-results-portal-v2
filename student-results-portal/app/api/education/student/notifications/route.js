@@ -21,6 +21,19 @@ export async function GET(){
       order by a.published_at desc
       limit 100
     `;
-    return NextResponse.json({ok:true,announcements});
+    const exists=await sql`select to_regclass('public.edu_student_revision_reminders') is not null as present`;
+    let reminders=[];
+    if(exists?.[0]?.present){
+      reminders=await sql`
+        select r.id,r.title,r.remind_at,r.repeat_rule,r.is_active,c.code,c.title as course_title,(r.remind_at<=now()) as is_due
+        from edu_student_revision_reminders r
+        left join edu_course_offerings o on o.id=r.offering_id
+        left join edu_courses c on c.id=o.course_id
+        where r.student_user_id=${access.user.id} and r.is_active=true
+        order by (r.remind_at<=now()) desc,r.remind_at asc
+        limit 50
+      `;
+    }
+    return NextResponse.json({ok:true,announcements,reminders});
   }catch(error){console.error('Student notifications unavailable:',error);return NextResponse.json({ok:false,error:'Unable to load announcements.'},{status:503});}
 }

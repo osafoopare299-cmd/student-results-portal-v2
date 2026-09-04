@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import {
   Activity, BarChart3, Bell, BookOpen, CalendarDays, CheckCircle2,
-  ClipboardCheck, FileText, GraduationCap, LayoutDashboard, Menu,
+  ClipboardCheck, FileText, GraduationCap, LayoutDashboard, ListTodo, Menu,
   MessageSquareText, ShieldCheck, Sparkles, Stethoscope, UserCog, UserRound,
   Wifi, X
 } from 'lucide-react';
@@ -20,6 +20,7 @@ const workspaces = {
       ['Assessments','MCQs, written tests, viva/OSCE and practicals',ClipboardCheck,'/education/student/assess'],
       ['Results','Published grades, percentages and assessment breakdowns',BarChart3,'/education/student/results'],
       ['Timetable','Classes, rotations, assessments and deadlines',CalendarDays,'/education/student/timetable'],
+      ['Study Planner','Plan revision tasks, deadlines and personal study goals',ListTodo,'/education/student/study-planner'],
       ['AI Tutor','Ask questions from approved course materials only',Sparkles,'/education/student/ai-tutor'],
       ['Practice Analytics','Track AI practice scores, trends, strong topics and weak areas',Activity,'/education/student/practice-analytics'],
       ['Notifications','Results, assignments, timetable and learning updates',Bell,'/education/student/notifications'],
@@ -85,6 +86,7 @@ export default function Workspace({ role, user=null, dashboard=null }) {
         {assessHref ? <Link href={assessHref}><ClipboardCheck size={18}/> Assessments</Link> : <a><ClipboardCheck size={18}/> Assessments</a>}
         {resultsHref ? <Link href={resultsHref}><BarChart3 size={18}/> Results</Link> : <a><BarChart3 size={18}/> Results</a>}
         {role==='student' && <Link href="/education/student/practice-analytics"><Activity size={18}/> Practice Analytics</Link>}
+        {role==='student' && <Link href="/education/student/study-planner"><ListTodo size={18}/> Study Planner</Link>}
         {timetableHref ? <Link href={timetableHref}><CalendarDays size={18}/> Timetable</Link> : <a><CalendarDays size={18}/> Timetable</a>}
         {notificationsHref ? <Link href={notificationsHref}><Bell size={18}/> Notifications</Link> : <a><Bell size={18}/> Notifications</a>}
         {role==='student' && <Link href="/education/student/profile"><UserRound size={18}/> My Profile</Link>}

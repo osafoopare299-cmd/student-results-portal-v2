@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { del } from '@vercel/blob';
 import { getEducationUser } from '../../../../../lib/education-session';
 import { getEducationSql } from '../../../../../lib/db';
 import { ensureEducationMaterialFileSchema,educationBlobConfigured } from '../../../../../lib/education-material-files';
@@ -6,6 +7,7 @@ import { educationUploadLimitLabel,validEducationFileMetadata } from '../../../.
 
 export const dynamic='force-dynamic';
 const clean=(v,max=5000)=>String(v??'').trim().slice(0,max);
+async function cleanupOrphan(pathname){if(!pathname||!educationBlobConfigured())return;try{await del(pathname);}catch(error){console.error('Orphan learning file cleanup failed:',error);}}
 
 export async function GET(){
  const access=await getEducationUser('lecturer'); if(!access.ok)return NextResponse.json({ok:false,error:'Lecturer access required.'},{status:401});
@@ -18,23 +20,25 @@ export async function GET(){
 
 export async function POST(request){
  const access=await getEducationUser('lecturer'); if(!access.ok)return NextResponse.json({ok:false,error:'Lecturer access required.'},{status:401});
+ let uploadedPath=null;
  try{
   const b=await request.json(),sql=getEducationSql();await ensureEducationMaterialFileSchema(sql);
   const offeringId=Number(b.offeringId),title=clean(b.title,240),description=clean(b.description,2000)||null,materialType=clean(b.materialType,20)||'note',resourceUrl=clean(b.resourceUrl,1500)||null,contentText=clean(b.contentText,20000)||null;
-  const blobPathname=clean(b.blobPathname,2000)||null,originalFilename=clean(b.originalFilename,500)||null,fileContentType=clean(b.fileContentType,200)||null,fileSizeBytes=Number(b.fileSizeBytes||0)||null;
-  if(!Number.isFinite(offeringId)||!title||!['note','pdf','video','link'].includes(materialType))return NextResponse.json({ok:false,error:'Course offering, title and valid material type are required.'},{status:400});
-  if(materialType==='link'&&!resourceUrl)return NextResponse.json({ok:false,error:'A resource URL is required for link materials.'},{status:400});
+  const blobPathname=clean(b.blobPathname,2000)||null,originalFilename=clean(b.originalFilename,500)||null,fileContentType=clean(b.fileContentType,200)||null,fileSizeBytes=Number(b.fileSizeBytes||0)||null;uploadedPath=blobPathname;
+  if(!Number.isFinite(offeringId)||!title||!['note','pdf','video','link'].includes(materialType)){await cleanupOrphan(uploadedPath);return NextResponse.json({ok:false,error:'Course offering, title and valid material type are required.'},{status:400});}
+  if(materialType==='link'&&!resourceUrl){await cleanupOrphan(uploadedPath);return NextResponse.json({ok:false,error:'A resource URL is required for link materials.'},{status:400});}
   if(['pdf','video'].includes(materialType)&&!resourceUrl&&!blobPathname)return NextResponse.json({ok:false,error:'Upload a file or provide a resource URL for PDF and video materials.'},{status:400});
-  if(blobPathname&&!['pdf','video'].includes(materialType))return NextResponse.json({ok:false,error:'Uploaded files can only be attached to PDF or video materials.'},{status:400});
-  if(blobPathname&&!blobPathname.startsWith(`education/${offeringId}/`))return NextResponse.json({ok:false,error:'Uploaded file does not belong to the selected course offering.'},{status:400});
+  if(blobPathname&&!['pdf','video'].includes(materialType)){await cleanupOrphan(uploadedPath);return NextResponse.json({ok:false,error:'Uploaded files can only be attached to PDF or video materials.'},{status:400});}
+  if(blobPathname&&!blobPathname.startsWith(`education/${offeringId}/`)){await cleanupOrphan(uploadedPath);return NextResponse.json({ok:false,error:'Uploaded file does not belong to the selected course offering.'},{status:400});}
   if(blobPathname&&!educationBlobConfigured())return NextResponse.json({ok:false,error:'File storage is not configured.'},{status:503});
-  if(blobPathname&&!validEducationFileMetadata(materialType,fileContentType,fileSizeBytes))return NextResponse.json({ok:false,error:`The uploaded ${materialType.toUpperCase()} file metadata is invalid or exceeds the ${educationUploadLimitLabel(materialType)} limit.`},{status:400});
-  if(Boolean(b.aiApproved)&&!contentText)return NextResponse.json({ok:false,error:'Add approved text/content before enabling this material as an AI Tutor source.'},{status:400});
+  if(blobPathname&&!validEducationFileMetadata(materialType,fileContentType,fileSizeBytes)){await cleanupOrphan(uploadedPath);return NextResponse.json({ok:false,error:`The uploaded ${materialType.toUpperCase()} file metadata is invalid or exceeds the ${educationUploadLimitLabel(materialType)} limit.`},{status:400});}
+  if(Boolean(b.aiApproved)&&!contentText){await cleanupOrphan(uploadedPath);return NextResponse.json({ok:false,error:'Add approved text/content before enabling this material as an AI Tutor source.'},{status:400});}
   const own=await sql`select id from edu_course_offerings where id=${offeringId} and lecturer_user_id=${access.user.id} limit 1`;
-  if(!own.length)return NextResponse.json({ok:false,error:'You can only publish to your assigned courses.'},{status:403});
+  if(!own.length){await cleanupOrphan(uploadedPath);return NextResponse.json({ok:false,error:'You can only publish to your assigned courses.'},{status:403});}
   const publishedAt=b.publish?new Date().toISOString():null;
   const rows=await sql`insert into edu_learning_materials (offering_id,created_by,title,description,material_type,resource_url,content_text,is_offline_available,is_ai_approved,published_at,blob_pathname,original_filename,file_content_type,file_size_bytes) values (${offeringId},${access.user.id},${title},${description},${materialType},${resourceUrl},${contentText},${Boolean(b.offline)},${Boolean(b.aiApproved)},${publishedAt},${blobPathname},${originalFilename},${fileContentType},${fileSizeBytes}) returning id,title,published_at`;
+  uploadedPath=null;
   await sql`insert into edu_audit_logs (actor_user_id,action,entity_type,entity_id,metadata) values (${access.user.id},'learning_material_created','edu_learning_material',${String(rows[0].id)},${JSON.stringify({published:Boolean(publishedAt),materialType,uploadedFile:Boolean(blobPathname),originalFilename,fileSizeBytes})}::jsonb)`;
   return NextResponse.json({ok:true,material:rows[0]});
- }catch(error){console.error('Material save unavailable:',error);return NextResponse.json({ok:false,error:'Unable to save learning material.'},{status:503});}
+ }catch(error){await cleanupOrphan(uploadedPath);console.error('Material save unavailable:',error);return NextResponse.json({ok:false,error:'Unable to save learning material.'},{status:503});}
 }

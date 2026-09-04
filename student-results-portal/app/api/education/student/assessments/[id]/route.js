@@ -21,6 +21,12 @@ function attemptExpired(assessment,attempt,now=Date.now()){
   return new Date(attempt.started_at).getTime()+Number(assessment.duration_minutes)*60000<=now;
 }
 
+function normalizeAnswerValue(value){
+  if(typeof value==='string')return value.slice(0,20000);
+  if(value===null||value===undefined)return '';
+  return String(value).slice(0,20000);
+}
+
 export async function GET(request,{params}){
   const access=await getEducationUser('student'); if(!access.ok)return NextResponse.json({ok:false,error:'Student access required.'},{status:401});
   try{const {id}=await params,sql=getEducationSql();await ensureEducationAssessmentReviewSchema(sql);const assessment=await studentAssessment(sql,id,access.user.id);if(!assessment)return NextResponse.json({ok:false,error:'Assessment not available.'},{status:404});
@@ -44,13 +50,22 @@ export async function POST(request,{params}){
     if(expired&&b.action!=='submit')return NextResponse.json({ok:false,error:'Time has expired. Submit your assessment.'},{status:409});
     if(b.action==='save'){
       const qid=Number(b.questionId);const q=(await sql`select id,question_type,options from edu_assessment_questions where id=${qid} and assessment_id=${id}`)[0];if(!q)return NextResponse.json({ok:false,error:'Question not found.'},{status:404});
-      const value=b.value??'';
+      const value=normalizeAnswerValue(b.value);
       if(q.question_type==='mcq'&&(!Array.isArray(q.options)||!q.options.some(option=>String(option)===String(value))))return NextResponse.json({ok:false,error:'Choose one of the published answer options.'},{status:400});
-      const normalized=typeof value==='string'?value.slice(0,20000):value;
-      await sql`insert into edu_assessment_answers (attempt_id,question_id,answer,updated_at) values (${attempt.id},${qid},${JSON.stringify({value:normalized})}::jsonb,now()) on conflict (attempt_id,question_id) do update set answer=excluded.answer,updated_at=now()`;return NextResponse.json({ok:true,attemptId:attempt.id});
+      await sql`insert into edu_assessment_answers (attempt_id,question_id,answer,updated_at) values (${attempt.id},${qid},${JSON.stringify({value})}::jsonb,now()) on conflict (attempt_id,question_id) do update set answer=excluded.answer,updated_at=now()`;return NextResponse.json({ok:true,attemptId:attempt.id});
     }
     if(b.action==='submit'){
-      const questions=await sql`select id,question_type,options,correct_answer,max_score,required from edu_assessment_questions where assessment_id=${id}`;const answers=await sql`select id,question_id,answer from edu_assessment_answers where attempt_id=${attempt.id}`;
+      const questions=await sql`select id,question_type,options,correct_answer,max_score,required from edu_assessment_questions where assessment_id=${id}`;
+      const snapshot=b.answers&&typeof b.answers==='object'&&!Array.isArray(b.answers)?b.answers:{};
+      for(const q of questions){
+        const key=String(q.id);
+        if(!Object.prototype.hasOwnProperty.call(snapshot,key)&&!Object.prototype.hasOwnProperty.call(snapshot,Number(q.id)))continue;
+        const raw=Object.prototype.hasOwnProperty.call(snapshot,key)?snapshot[key]:snapshot[Number(q.id)];
+        const value=normalizeAnswerValue(raw);
+        if(q.question_type==='mcq'&&value!==''&&(!Array.isArray(q.options)||!q.options.some(option=>String(option)===String(value))))continue;
+        await sql`insert into edu_assessment_answers(attempt_id,question_id,answer,updated_at) values(${attempt.id},${q.id},${JSON.stringify({value})}::jsonb,now()) on conflict(attempt_id,question_id) do update set answer=excluded.answer,updated_at=now()`;
+      }
+      const answers=await sql`select id,question_id,answer from edu_assessment_answers where attempt_id=${attempt.id}`;
       if(!expired){
         const missingRequired=questions.filter(q=>q.required).find(q=>{const a=answers.find(x=>Number(x.question_id)===Number(q.id));return !a||String(a.answer?.value??'').trim()==='';});
         if(missingRequired)return NextResponse.json({ok:false,error:'Answer all required questions before submitting.'},{status:400});

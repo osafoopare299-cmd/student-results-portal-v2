@@ -3,6 +3,7 @@ import { del } from '@vercel/blob';
 import { getEducationUser } from '../../../../../../lib/education-session';
 import { getEducationSql } from '../../../../../../lib/db';
 import { ensureEducationMaterialFileSchema,educationBlobConfigured } from '../../../../../../lib/education-material-files';
+import { educationUploadLimitLabel,validEducationFileMetadata } from '../../../../../../lib/education-upload-limits';
 
 export const dynamic='force-dynamic';
 const clean=(v,max=5000)=>String(v??'').trim().slice(0,max);
@@ -32,6 +33,7 @@ export async function PATCH(request,{params}){
     if(['pdf','video'].includes(materialType)&&!resourceUrl&&!blobPathname)return NextResponse.json({ok:false,error:'Upload a file or provide a resource URL for PDF and video materials.'},{status:400});
     if(blobPathname&&!['pdf','video'].includes(materialType))return NextResponse.json({ok:false,error:'Uploaded files can only be attached to PDF or video materials.'},{status:400});
     if(blobPathname&&!String(blobPathname).startsWith(`education/${material.offering_id}/`))return NextResponse.json({ok:false,error:'Uploaded file does not belong to this course offering.'},{status:400});
+    if(blobPathname&&!validEducationFileMetadata(materialType,fileContentType,fileSizeBytes))return NextResponse.json({ok:false,error:`The uploaded ${materialType.toUpperCase()} file metadata is invalid or exceeds the ${educationUploadLimitLabel(materialType)} limit.`},{status:400});
     const offline=b.offline===undefined?material.is_offline_available:Boolean(b.offline);
     const aiApproved=b.aiApproved===undefined?material.is_ai_approved:Boolean(b.aiApproved);
     if(aiApproved&&!contentText)return NextResponse.json({ok:false,error:'Add approved text/content before enabling this material as an AI Tutor source.'},{status:400});
@@ -42,7 +44,7 @@ export async function PATCH(request,{params}){
     if(material.blob_pathname&&material.blob_pathname!==blobPathname&&educationBlobConfigured()){
       try{await del(material.blob_pathname);}catch(error){console.error('Old learning file cleanup failed:',error);}
     }
-    await sql`insert into edu_audit_logs (actor_user_id,action,entity_type,entity_id,metadata) values (${access.user.id},'learning_material_updated','edu_learning_material',${String(id)},${JSON.stringify({published:Boolean(publishedAt),offline,aiApproved,uploadedFile:Boolean(blobPathname),originalFilename})}::jsonb)`;
+    await sql`insert into edu_audit_logs (actor_user_id,action,entity_type,entity_id,metadata) values (${access.user.id},'learning_material_updated','edu_learning_material',${String(id)},${JSON.stringify({published:Boolean(publishedAt),offline,aiApproved,uploadedFile:Boolean(blobPathname),originalFilename,fileSizeBytes})}::jsonb)`;
     return NextResponse.json({ok:true,material:rows[0]});
   }catch(error){console.error('Learning material update unavailable:',error);return NextResponse.json({ok:false,error:'Unable to update learning material.'},{status:503});}
 }

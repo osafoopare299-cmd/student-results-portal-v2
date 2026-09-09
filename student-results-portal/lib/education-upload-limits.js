@@ -1,4 +1,4 @@
-export const EDUCATION_PDF_MAX_BYTES=50*1024*1024;
+export const EDUCATION_PDF_MAX_BYTES=250*1024*1024;
 export const EDUCATION_VIDEO_MAX_BYTES=250*1024*1024;
 
 export function educationUploadLimitFor(type){
@@ -6,7 +6,7 @@ export function educationUploadLimitFor(type){
 }
 
 export function educationUploadLimitLabel(type){
-  return type==='pdf'?'50 MB':type==='video'?'250 MB':'0 MB';
+  return type==='pdf'?'250 MB':type==='video'?'250 MB':'0 MB';
 }
 
 export function validEducationFileMetadata(type,contentType,sizeBytes){

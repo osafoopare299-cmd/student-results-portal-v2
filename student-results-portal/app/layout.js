@@ -1,6 +1,4 @@
 import './globals.css';
-import PWARegister from './education/pwa-register';
-
 export const metadata = {
   title: {
     default: 'Dropare Student Education System',
@@ -27,7 +25,7 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body><PWARegister />{children}</body>
+      <body>{children}</body>
     </html>
   );
 }

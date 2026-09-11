@@ -26,16 +26,13 @@ export default function EducationLogoutButton({ admin = false }) {
   }
 
   return (
-    <button
+    <div style={{display:'flex',justifyContent:'flex-end',padding:'12px 16px calc(16px + env(safe-area-inset-bottom))',background:'#f8fcfa'}}>
+      <button
       type="button"
       onClick={logout}
       disabled={busy}
       aria-label="Log out of Dropare Education"
       style={{
-        position: 'fixed',
-        right: 18,
-        bottom: 18,
-        zIndex: 1000,
         display: 'inline-flex',
         alignItems: 'center',
         gap: 8,
@@ -53,6 +50,7 @@ export default function EducationLogoutButton({ admin = false }) {
     >
       <LogOut size={17} />
       {busy ? 'Logging out…' : 'Log out'}
-    </button>
+      </button>
+    </div>
   );
 }

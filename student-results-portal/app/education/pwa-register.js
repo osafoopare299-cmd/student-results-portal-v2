@@ -63,7 +63,7 @@ export default function PWARegister(){
     setInstallEvent(null);
   }
 
-  return <div aria-label="Education app status" style={{position:'fixed',right:14,top:12,zIndex:9999,display:'flex',alignItems:'center',gap:8,fontFamily:'Arial,sans-serif'}}>
+  return <div aria-label="Education app status" style={{position:'relative',zIndex:1,display:'flex',alignItems:'center',justifyContent:'flex-end',gap:8,padding:'8px 12px',minHeight:44,boxSizing:'border-box',borderBottom:'1px solid #dce9e3',background:'#f8fcfa',fontFamily:'Arial,sans-serif'}}>
     <div role="status" style={{display:'flex',alignItems:'center',gap:7,border:`1px solid ${online?'#b9d9cc':'#e8c98e'}`,background:online?'#edf8f3':'#fff5df',color:online?'#176a4c':'#8a5700',padding:'9px 12px',borderRadius:999,boxShadow:'0 8px 24px rgba(19,61,43,.12)',fontSize:11,fontWeight:850,letterSpacing:'.08em',whiteSpace:'nowrap'}}>
       <span aria-hidden="true" style={{width:7,height:7,borderRadius:'50%',background:online?'#1b9b68':'#d38316'}}/>{online?'ONLINE':'OFFLINE'}
     </div>

@@ -8,5 +8,5 @@ export const metadata = {
 };
 
 export default function EducationLayout({ children }) {
-  return <>{children}<PWARegister /></>;
+  return <><PWARegister />{children}</>;
 }

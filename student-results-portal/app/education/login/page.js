@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { GraduationCap, LockKeyhole, Mail, ShieldCheck, Stethoscope, UserPlus } from 'lucide-react';
 import { educationAuthClient } from '../../../lib/education-auth-client';
+import { signInEducationAccount } from './actions';
 import styles from './page.module.css';
 
 export default function EducationLogin(){
@@ -13,7 +14,7 @@ export default function EducationLogin(){
   const [mode,setMode]=useState('signin');
 
   async function resolveRole(){
-    const response=await fetch('/api/education/me',{ cache:'no-store' });
+    const response=await fetch('/api/education/me',{ cache:'no-store', credentials:'include' });
     const payload=await response.json().catch(()=>({}));
     if (!response.ok || !payload?.user?.role) throw new Error(payload?.error || 'Your education role could not be resolved.');
     const destinations={ student:'/education/student', lecturer:'/education/lecturer', admin:'/education/admin' };
@@ -51,8 +52,8 @@ export default function EducationLogin(){
         return;
       }
 
-      const result=await educationAuthClient.signIn.email({ email, password });
-      if (result?.error) throw new Error(result.error.message || 'Unable to sign in.');
+      const result=await signInEducationAccount(email, password);
+      if (!result?.ok) throw new Error(result?.error || 'Unable to sign in.');
       await resolveRole();
     } catch (err) {
       setError(err?.message || 'Unable to continue. Please try again.');

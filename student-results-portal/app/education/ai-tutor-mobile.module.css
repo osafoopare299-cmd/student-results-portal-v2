@@ -1,0 +1,8 @@
+@media (max-width: 820px) {
+  .page { overflow-x: hidden; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .sources { min-width: 0; }
+  .chat { height: auto; min-height: 0; max-height: none; overflow: visible; }
+  .chatBody { overflow: visible; overscroll-behavior: auto; touch-action: pan-y; }
+  .bubble { overflow-wrap: anywhere; }
+}

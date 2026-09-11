@@ -9,6 +9,7 @@ import {
   Wifi, X
 } from 'lucide-react';
 import styles from './page.module.css';
+import EducationLogoutButton from './logout-button';
 
 const workspaces = {
   student: {
@@ -94,6 +95,7 @@ export default function Workspace({ role, user=null, dashboard=null }) {
         {timetableHref ? <Link href={timetableHref}><CalendarDays size={18}/> Timetable</Link> : <a><CalendarDays size={18}/> Timetable</a>}
         {notificationsHref ? <Link href={notificationsHref}><Bell size={18}/> Notifications</Link> : <a><Bell size={18}/> Notifications</a>}
         {role==='student' && <Link href="/education/student/profile"><UserRound size={18}/> My Profile</Link>}
+        {role==='student' && <EducationLogoutButton menu/>}
       </nav>
       <div className={styles.sidebarFoot}><ShieldCheck size={18}/><span>Authenticated role access enforced</span></div>
     </aside>

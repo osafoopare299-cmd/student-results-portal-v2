@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { GraduationCap, LockKeyhole, Mail, ShieldCheck, Stethoscope, UserPlus } from 'lucide-react';
+import { Eye, EyeOff, GraduationCap, LockKeyhole, Mail, ShieldCheck, Stethoscope, UserPlus } from 'lucide-react';
 import { educationAuthClient } from '../../../lib/education-auth-client';
 import { signInEducationAccount } from './actions';
 import styles from './page.module.css';
@@ -12,6 +12,8 @@ export default function EducationLogin(){
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const [mode,setMode]=useState('signin');
+  const [showPassword,setShowPassword]=useState(false);
+  const [showConfirmPassword,setShowConfirmPassword]=useState(false);
 
   async function resolveRole(){
     const response=await fetch('/api/education/me',{ cache:'no-store', credentials:'include' });
@@ -62,7 +64,7 @@ export default function EducationLogin(){
   }
 
   function changeMode(next){
-    setMode(next); setError(''); setNotice('');
+    setMode(next); setError(''); setNotice(''); setShowPassword(false); setShowConfirmPassword(false);
   }
 
   return <main className={styles.page}><section className={styles.card}>
@@ -76,8 +78,8 @@ export default function EducationLogin(){
 
     <form onSubmit={submit}>
       <label>Email address<div><Mail size={18}/><input name="email" type="email" placeholder="your@email.com" autoComplete="email" required/></div></label>
-      <label>{mode==='signin'?'Password':'Choose password'}<div><LockKeyhole size={18}/><input name="password" type="password" placeholder="••••••••" autoComplete={mode==='signin'?'current-password':'new-password'} required/></div></label>
-      {mode==='activate' && <label>Confirm password<div><LockKeyhole size={18}/><input name="confirmPassword" type="password" placeholder="••••••••" autoComplete="new-password" required/></div></label>}
+      <label>{mode==='signin'?'Password':'Choose password'}<div><LockKeyhole size={18}/><input name="password" type={showPassword?'text':'password'} placeholder="••••••••" autoComplete={mode==='signin'?'current-password':'new-password'} required/><button className={styles.passwordToggle} type="button" onClick={()=>setShowPassword(value=>!value)} aria-label={showPassword?'Hide password':'Show password'} title={showPassword?'Hide password':'Show password'}>{showPassword?<EyeOff size={20}/>:<Eye size={20}/>}</button></div></label>
+      {mode==='activate' && <label>Confirm password<div><LockKeyhole size={18}/><input name="confirmPassword" type={showConfirmPassword?'text':'password'} placeholder="••••••••" autoComplete="new-password" required/><button className={styles.passwordToggle} type="button" onClick={()=>setShowConfirmPassword(value=>!value)} aria-label={showConfirmPassword?'Hide confirmed password':'Show confirmed password'} title={showConfirmPassword?'Hide password':'Show password'}>{showConfirmPassword?<EyeOff size={20}/>:<Eye size={20}/>}</button></div></label>}
       {error && <p className={styles.error}>{error}</p>}
       {notice && <p className={styles.notice}>{notice}</p>}
       <button type="submit" disabled={busy}>{mode==='activate'?<UserPlus size={18}/>:<ShieldCheck size={18}/>} {busy?(mode==='activate'?'Activating…':'Signing in…'):(mode==='activate'?'Activate account':'Sign in')}</button>

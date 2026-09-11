@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { isAdmin } from '../../../../../lib/admin-auth';
 import { getEducationSql } from '../../../../../lib/db';
+import { del } from '@vercel/blob';
+import { educationBlobConfigured } from '../../../../../lib/education-material-files';
 
 function clean(value,max=180){return String(value||'').trim().slice(0,max);}
 
@@ -47,4 +49,29 @@ export async function POST(request){
     console.error('Education catalog save unavailable:',error);
     return NextResponse.json({ok:false,error:'Education database setup is not ready yet.'},{status:503});
   }
+}
+
+export async function DELETE(request){
+  if(!(await isAdmin())) return NextResponse.json({ok:false,error:'Administrator sign-in required.'},{status:401});
+  try{
+    const {searchParams}=new URL(request.url),type=clean(searchParams.get('type'),20),id=Number(searchParams.get('id'));
+    if(!id||!['course','class'].includes(type)) return NextResponse.json({ok:false,error:'A valid course or class is required.'},{status:400});
+    const sql=getEducationSql();
+    const item=type==='course'?(await sql`select id,code as label from edu_courses where id=${id} limit 1`)[0]:(await sql`select id,name as label from edu_classes where id=${id} limit 1`)[0];
+    if(!item) return NextResponse.json({ok:false,error:`${type==='course'?'Course':'Class'} not found.`},{status:404});
+    const files=type==='course'
+      ?await sql`select m.blob_pathname from edu_learning_materials m join edu_course_offerings o on o.id=m.offering_id where o.course_id=${id} and m.blob_pathname is not null`
+      :await sql`select m.blob_pathname from edu_learning_materials m join edu_course_offerings o on o.id=m.offering_id where o.class_id=${id} and m.blob_pathname is not null`;
+    if(type==='course'){
+      await sql`delete from edu_course_offerings where course_id=${id}`;
+      await sql`delete from edu_courses where id=${id}`;
+    }else{
+      await sql`update edu_student_profiles set class_id=null where class_id=${id}`;
+      await sql`delete from edu_course_offerings where class_id=${id}`;
+      await sql`delete from edu_classes where id=${id}`;
+    }
+    await sql`insert into edu_audit_logs(action,entity_type,entity_id,metadata) values('admin_catalog_item_deleted',${type},${String(id)},${JSON.stringify({label:item.label})}::jsonb)`;
+    if(educationBlobConfigured()&&files.length) await Promise.allSettled(files.map(file=>del(file.blob_pathname)));
+    return NextResponse.json({ok:true,removed:type,label:item.label});
+  }catch(error){console.error('Education catalog delete unavailable:',error);return NextResponse.json({ok:false,error:'Unable to remove this item and its related entries.'},{status:503});}
 }

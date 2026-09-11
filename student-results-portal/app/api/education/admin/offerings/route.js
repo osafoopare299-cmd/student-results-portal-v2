@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { isAdmin } from '../../../../../lib/admin-auth';
 import { getEducationSql } from '../../../../../lib/db';
+import { del } from '@vercel/blob';
+import { educationBlobConfigured } from '../../../../../lib/education-material-files';
 
 export const dynamic='force-dynamic';
 
@@ -70,4 +72,19 @@ export async function POST(request){
     console.error('Education offering save unavailable:',error);
     return NextResponse.json({ok:false,error:'Unable to save course offering.'},{status:503});
   }
+}
+
+export async function DELETE(request){
+  const denied=await guard(); if(denied) return denied;
+  try{
+    const id=Number(new URL(request.url).searchParams.get('id'));if(!id)return NextResponse.json({ok:false,error:'Course offering is required.'},{status:400});
+    const sql=getEducationSql();
+    const offering=(await sql`select o.id,c.code,cl.name as class_name,o.term from edu_course_offerings o join edu_courses c on c.id=o.course_id join edu_classes cl on cl.id=o.class_id where o.id=${id} limit 1`)[0];
+    if(!offering)return NextResponse.json({ok:false,error:'Course offering not found.'},{status:404});
+    const files=await sql`select blob_pathname from edu_learning_materials where offering_id=${id} and blob_pathname is not null`;
+    await sql`delete from edu_course_offerings where id=${id}`;
+    await sql`insert into edu_audit_logs(action,entity_type,entity_id,metadata) values('admin_course_offering_deleted','course_offering',${String(id)},${JSON.stringify({code:offering.code,className:offering.class_name,term:offering.term})}::jsonb)`;
+    if(educationBlobConfigured()&&files.length)await Promise.allSettled(files.map(file=>del(file.blob_pathname)));
+    return NextResponse.json({ok:true});
+  }catch(error){console.error('Education offering delete unavailable:',error);return NextResponse.json({ok:false,error:'Unable to remove course offering.'},{status:503});}
 }

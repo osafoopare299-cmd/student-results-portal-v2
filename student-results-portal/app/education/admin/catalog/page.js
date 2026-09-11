@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, BookOpen, GraduationCap, RefreshCw, Save, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, BookOpen, GraduationCap, RefreshCw, Save, ShieldCheck, X } from 'lucide-react';
 import styles from './catalog.module.css';
 
 export default function EducationCatalogAdmin(){
@@ -33,6 +33,13 @@ export default function EducationCatalogAdmin(){
     }catch(err){setMessage(err.message);}finally{setBusy(false);}
   }
 
+  async function remove(type,item){
+    const label=type==='course'?`${item.code} — ${item.title}`:item.name;
+    if(!confirm(`Remove ${label}? Related offerings, enrolments, materials, assessments and schedules will also be removed. This cannot be undone.`))return;
+    setBusy(true);setMessage('Removing entry…');
+    try{const res=await fetch(`/api/education/admin/catalog?type=${type}&id=${item.id}`,{method:'DELETE'}),json=await res.json();if(!res.ok)throw new Error(json.error||'Unable to remove entry.');setMessage(`${type==='course'?'Course':'Class'} removed.`);await load();}catch(err){setMessage(err.message);}finally{setBusy(false);}
+  }
+
   return <main className={styles.page}><div className={styles.wrap}>
     <div className={styles.top}><Link href="/education/admin"><ArrowLeft size={18}/> Administrator</Link><span><ShieldCheck size={16}/> Protected workspace</span></div>
     <section className={styles.hero}><div><small>ACADEMIC STRUCTURE</small><h1>Courses & Classes</h1><p>Create the academic structure that enrolments, lecturers, timetables and assessments will use.</p></div><GraduationCap size={42}/></section>
@@ -57,8 +64,8 @@ export default function EducationCatalogAdmin(){
     </section>
 
     <section className={styles.lists}>
-      <article className={styles.card}><div className={styles.listHead}><h2>Courses</h2><button className={styles.refresh} onClick={load} disabled={busy}><RefreshCw size={16}/></button></div>{data.courses.length?data.courses.map(c=><div className={styles.row} key={c.id}><div><strong>{c.code}</strong><small>{c.title}</small></div><span>{c.active?'Active':'Inactive'}</span></div>):<div className={styles.empty}>No courses available yet.</div>}</article>
-      <article className={styles.card}><div className={styles.listHead}><h2>Classes</h2></div>{data.classes.length?data.classes.map(c=><div className={styles.row} key={c.id}><div><strong>{c.name}</strong><small>{[c.code,c.level,c.academic_year].filter(Boolean).join(' · ')}</small></div></div>):<div className={styles.empty}>No classes available yet.</div>}</article>
+      <article className={styles.card}><div className={styles.listHead}><h2>Courses</h2><button className={styles.refresh} onClick={load} disabled={busy}><RefreshCw size={16}/></button></div>{data.courses.length?data.courses.map(c=><div className={styles.row} key={c.id}><div><strong>{c.code}</strong><small>{c.title}</small></div><span>{c.active?'Active':'Inactive'}</span><button className={styles.remove} disabled={busy} onClick={()=>remove('course',c)} aria-label={`Remove ${c.code}`}><X size={16}/> Remove</button></div>):<div className={styles.empty}>No courses available yet.</div>}</article>
+      <article className={styles.card}><div className={styles.listHead}><h2>Classes</h2></div>{data.classes.length?data.classes.map(c=><div className={styles.row} key={c.id}><div><strong>{c.name}</strong><small>{[c.code,c.level,c.academic_year].filter(Boolean).join(' · ')}</small></div><button className={styles.remove} disabled={busy} onClick={()=>remove('class',c)} aria-label={`Remove ${c.name}`}><X size={16}/> Remove</button></div>):<div className={styles.empty}>No classes available yet.</div>}</article>
     </section>
   </div></main>;
 }

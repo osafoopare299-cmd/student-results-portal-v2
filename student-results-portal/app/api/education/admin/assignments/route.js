@@ -78,3 +78,14 @@ export async function POST(request){
   return NextResponse.json({ok:false,error:'Unknown assignment action.'},{status:400});
  }catch(error){console.error(error);return NextResponse.json({ok:false,error:'Unable to save assignment.'},{status:503});}
 }
+
+export async function DELETE(request){
+ const denied=await guard(); if(denied) return denied;
+ try{
+  const id=Number(new URL(request.url).searchParams.get('id'));if(!id)return NextResponse.json({ok:false,error:'Enrolment is required.'},{status:400});
+  const sql=getEducationSql();const row=(await sql`delete from edu_enrolments where id=${id} returning id,student_user_id,offering_id`)[0];
+  if(!row)return NextResponse.json({ok:false,error:'Enrolment not found.'},{status:404});
+  await audit(sql,'admin_student_unenrolled','enrolment',id,{studentId:row.student_user_id,offeringId:row.offering_id});
+  return NextResponse.json({ok:true});
+ }catch(error){console.error(error);return NextResponse.json({ok:false,error:'Unable to remove enrolment.'},{status:503});}
+}

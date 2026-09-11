@@ -28,7 +28,7 @@ async function accessibleMaterial(sql,studentId,materialId){
     join edu_courses c on c.id=o.course_id
     join edu_enrolments e on e.offering_id=o.id
     where m.id=${materialId}
-      and m.is_published=true
+      and m.published_at is not null
       and e.student_user_id=${studentId}
       and e.status='active'
     limit 1
@@ -49,7 +49,7 @@ export async function GET(){
       join edu_course_offerings o on o.id=m.offering_id
       join edu_enrolments e on e.offering_id=o.id
       where l.student_user_id=${access.user.id}
-        and m.is_published=true
+        and m.published_at is not null
         and e.student_user_id=${access.user.id}
         and e.status='active'
       order by l.updated_at desc

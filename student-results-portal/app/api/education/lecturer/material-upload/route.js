@@ -3,13 +3,14 @@ import { handleUpload } from '@vercel/blob/client';
 import { getEducationUser } from '../../../../../lib/education-session';
 import { getEducationSql } from '../../../../../lib/db';
 import { educationBlobConfigured } from '../../../../../lib/education-material-files';
+import { EDUCATION_FILE_CONTENT_TYPES,EDUCATION_VIDEO_CONTENT_TYPES } from '../../../../../lib/education-upload-limits';
 
 export const dynamic='force-dynamic';
 
 export async function GET(){
   const access=await getEducationUser('lecturer');
   if(!access.ok)return NextResponse.json({ok:false,error:'Lecturer access required.'},{status:401});
-  return NextResponse.json({ok:true,configured:educationBlobConfigured(),allowedTypes:['application/pdf','video/mp4','video/webm','video/quicktime']});
+  return NextResponse.json({ok:true,configured:educationBlobConfigured(),allowedTypes:['application/pdf',...EDUCATION_VIDEO_CONTENT_TYPES,...EDUCATION_FILE_CONTENT_TYPES]});
 }
 
 export async function POST(request){
@@ -27,11 +28,11 @@ export async function POST(request){
         try{payload=JSON.parse(clientPayload||'{}');}catch{}
         const offeringId=Number(payload.offeringId);
         const materialType=String(payload.materialType||'').toLowerCase();
-        if(!Number.isFinite(offeringId)||!['pdf','video'].includes(materialType))throw new Error('Choose an assigned course and PDF or video material type before uploading.');
+        if(!Number.isFinite(offeringId)||!['pdf','video','file'].includes(materialType))throw new Error('Choose an assigned course before uploading.');
         const owned=(await sql`select id from edu_course_offerings where id=${offeringId} and lecturer_user_id=${access.user.id} limit 1`)[0];
         if(!owned)throw new Error('You can only upload files to your assigned courses.');
         return {
-          allowedContentTypes:materialType==='pdf'?['application/pdf']:['video/mp4','video/webm','video/quicktime'],
+          allowedContentTypes:materialType==='pdf'?['application/pdf']:materialType==='video'?EDUCATION_VIDEO_CONTENT_TYPES:EDUCATION_FILE_CONTENT_TYPES,
           addRandomSuffix:true,
           tokenPayload:JSON.stringify({userId:access.user.id,offeringId,materialType,pathname:String(pathname||'')})
         };

@@ -14,7 +14,7 @@ export async function GET(){
  try{const sql=getEducationSql();await ensureEducationMaterialFileSchema(sql);
   const offerings=await sql`select o.id,c.code,c.title,cl.name as class_name,y.name as academic_year,o.term from edu_course_offerings o join edu_courses c on c.id=o.course_id join edu_classes cl on cl.id=o.class_id join edu_academic_years y on y.id=o.academic_year_id where o.lecturer_user_id=${access.user.id} order by y.name desc,c.code`;
   const materials=await sql`select m.id,m.offering_id,m.title,m.description,m.material_type,m.resource_url,m.content_text,m.is_offline_available,m.is_ai_approved,m.published_at,m.created_at,m.blob_pathname,m.original_filename,m.file_content_type,m.file_size_bytes,c.code,c.title as course_title,cl.name as class_name from edu_learning_materials m join edu_course_offerings o on o.id=m.offering_id join edu_courses c on c.id=o.course_id join edu_classes cl on cl.id=o.class_id where m.created_by=${access.user.id} order by m.created_at desc limit 200`;
-  return NextResponse.json({ok:true,offerings,materials,fileStorageConfigured:educationBlobConfigured(),uploadLimits:{pdf:educationUploadLimitLabel('pdf'),video:educationUploadLimitLabel('video')}});
+  return NextResponse.json({ok:true,offerings,materials,fileStorageConfigured:educationBlobConfigured(),uploadLimits:{pdf:educationUploadLimitLabel('pdf'),video:educationUploadLimitLabel('video'),file:educationUploadLimitLabel('file')}});
  }catch(error){console.error('Lecturer materials unavailable:',error);return NextResponse.json({ok:false,error:'Learning materials database setup is not ready yet.'},{status:503});}
 }
 
@@ -25,10 +25,10 @@ export async function POST(request){
   const b=await request.json(),sql=getEducationSql();await ensureEducationMaterialFileSchema(sql);
   const offeringId=Number(b.offeringId),title=clean(b.title,240),description=clean(b.description,2000)||null,materialType=clean(b.materialType,20)||'note',resourceUrl=clean(b.resourceUrl,1500)||null,contentText=clean(b.contentText,20000)||null;
   const blobPathname=clean(b.blobPathname,2000)||null,originalFilename=clean(b.originalFilename,500)||null,fileContentType=clean(b.fileContentType,200)||null,fileSizeBytes=Number(b.fileSizeBytes||0)||null;uploadedPath=blobPathname;
-  if(!Number.isFinite(offeringId)||!title||!['note','pdf','video','link'].includes(materialType)){await cleanupOrphan(uploadedPath);return NextResponse.json({ok:false,error:'Course offering, title and valid material type are required.'},{status:400});}
+  if(!Number.isFinite(offeringId)||!title||!['note','pdf','video','file','link'].includes(materialType)){await cleanupOrphan(uploadedPath);return NextResponse.json({ok:false,error:'Course offering, title and valid material type are required.'},{status:400});}
   if(materialType==='link'&&!resourceUrl){await cleanupOrphan(uploadedPath);return NextResponse.json({ok:false,error:'A resource URL is required for link materials.'},{status:400});}
-  if(['pdf','video'].includes(materialType)&&!resourceUrl&&!blobPathname)return NextResponse.json({ok:false,error:'Upload a file or provide a resource URL for PDF and video materials.'},{status:400});
-  if(blobPathname&&!['pdf','video'].includes(materialType)){await cleanupOrphan(uploadedPath);return NextResponse.json({ok:false,error:'Uploaded files can only be attached to PDF or video materials.'},{status:400});}
+  if(['pdf','video','file'].includes(materialType)&&!resourceUrl&&!blobPathname)return NextResponse.json({ok:false,error:'Upload a file or provide a resource URL.'},{status:400});
+  if(blobPathname&&!['pdf','video','file'].includes(materialType)){await cleanupOrphan(uploadedPath);return NextResponse.json({ok:false,error:'Choose a file material type for uploaded files.'},{status:400});}
   if(blobPathname&&!blobPathname.startsWith(`education/${offeringId}/`)){await cleanupOrphan(uploadedPath);return NextResponse.json({ok:false,error:'Uploaded file does not belong to the selected course offering.'},{status:400});}
   if(blobPathname&&!educationBlobConfigured())return NextResponse.json({ok:false,error:'File storage is not configured.'},{status:503});
   if(blobPathname&&!validEducationFileMetadata(materialType,fileContentType,fileSizeBytes)){await cleanupOrphan(uploadedPath);return NextResponse.json({ok:false,error:`The uploaded ${materialType.toUpperCase()} file metadata is invalid or exceeds the ${educationUploadLimitLabel(materialType)} limit.`},{status:400});}

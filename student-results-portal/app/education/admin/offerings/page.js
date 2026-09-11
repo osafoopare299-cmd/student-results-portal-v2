@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import {useEffect,useMemo,useState} from 'react';
+import {X} from 'lucide-react';
 
 export default function CourseOfferings(){
   const [data,setData]=useState({courses:[],classes:[],years:[],lecturers:[],offerings:[]});
@@ -31,6 +32,10 @@ export default function CourseOfferings(){
     setMessage(d.ok?'Course offering saved.':d.error);
     if(d.ok){setForm(f=>({...f,courseId:'',classId:'',lecturerId:'',term:''}));load();}
   }
+  async function removeOffering(offering){
+    if(!confirm(`Remove ${offering.code} for ${offering.class_name} (${offering.term})? Enrolments, materials, assessments and timetable entries for this offering will also be removed.`))return;
+    setMessage('Removing course offering…');const r=await fetch(`/api/education/admin/offerings?id=${offering.id}`,{method:'DELETE'}),d=await r.json();setMessage(d.ok?'Course offering removed.':d.error);if(d.ok)load();
+  }
 
   const card={background:'#fff',border:'1px solid #dfeae5',borderRadius:20,padding:22};
   const field={width:'100%',padding:12,border:'1px solid #d7e5de',borderRadius:11,background:'#fff',boxSizing:'border-box'};
@@ -54,7 +59,7 @@ export default function CourseOfferings(){
         </form>
         <section style={{...card,minWidth:0}}>
           <h2 style={{marginTop:0}}>Existing offerings</h2>
-          {data.offerings.length?data.offerings.map(o=><article key={o.id} style={{padding:'14px 0',borderBottom:'1px solid #edf2ef',overflowWrap:'anywhere'}}><b>{o.code} — {o.title}</b><div style={{color:'#70847c',fontSize:13,marginTop:5}}>{o.class_name}{o.class_code?` (${o.class_code})`:''} • {o.academic_year} • {o.term}</div><div style={{color:'#08744d',fontSize:12,marginTop:5,fontWeight:700}}>{o.lecturer_name||'Lecturer not assigned'}</div></article>):<p style={{color:'#70847c'}}>{message||'No course offerings yet.'}</p>}
+          {data.offerings.length?data.offerings.map(o=><article key={o.id} style={{padding:'14px 0',borderBottom:'1px solid #edf2ef',overflowWrap:'anywhere',display:'grid',gridTemplateColumns:'1fr auto',gap:10,alignItems:'center'}}><div><b>{o.code} — {o.title}</b><div style={{color:'#70847c',fontSize:13,marginTop:5}}>{o.class_name}{o.class_code?` (${o.class_code})`:''} • {o.academic_year} • {o.term}</div><div style={{color:'#08744d',fontSize:12,marginTop:5,fontWeight:700}}>{o.lecturer_name||'Lecturer not assigned'}</div></div><button onClick={()=>removeOffering(o)} aria-label={`Remove ${o.code} offering`} style={{display:'flex',alignItems:'center',gap:4,border:'1px solid #f0cccc',borderRadius:9,padding:'8px 9px',background:'#fff5f5',color:'#a12b2b',fontWeight:800,cursor:'pointer'}}><X size={16}/> Remove</button></article>):<p style={{color:'#70847c'}}>{message||'No course offerings yet.'}</p>}
         </section>
       </div>
       <section style={{...card,marginTop:18}}><b>Next step</b><p style={{color:'#657d74',marginBottom:0}}>After creating an offering, use <Link href="/education/admin/assignments" style={{color:'#08744d',fontWeight:800}}>Enrolments & Teaching Assignments</Link> to assign students and lecturers.</p></section>

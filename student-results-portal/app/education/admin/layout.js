@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { LockKeyhole, ShieldCheck, Stethoscope } from 'lucide-react';
 import { isAdmin } from '../../../lib/admin-auth';
+import EducationLogoutButton from '../logout-button';
 
 export const dynamic = 'force-dynamic';
 
 export default async function EducationAdminLayout({children}){
   const authenticated=await isAdmin();
-  if(authenticated) return children;
+  if(authenticated) return <>{children}<EducationLogoutButton admin /></>;
 
   return <main style={{minHeight:'100vh',display:'grid',placeItems:'center',padding:'24px',background:'linear-gradient(160deg,#e9f8ef,#f7fbf8)',fontFamily:'Arial,sans-serif'}}>
     <section style={{width:'min(100%,460px)',background:'#fff',border:'1px solid #dcebe1',borderRadius:'24px',padding:'32px',boxShadow:'0 22px 60px rgba(17,78,45,.12)'}}>

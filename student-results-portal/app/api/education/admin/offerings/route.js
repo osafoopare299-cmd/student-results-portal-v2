@@ -1,21 +1,27 @@
-import { NextResponse } from 'next/server';
-import { isAdmin } from '../../../../../lib/admin-auth';
-import { getEducationSql } from '../../../../../lib/db';
-import { del } from '@vercel/blob';
-import { educationBlobConfigured } from '../../../../../lib/education-material-files';
+import { NextResponse } from "next/server";
+import { isAdmin } from "../../../../../lib/admin-auth";
+import { getEducationSql } from "../../../../../lib/db";
+import { del } from "@vercel/blob";
+import { educationBlobConfigured } from "../../../../../lib/education-material-files";
+import { deliverEducationEmail } from "../../../../../lib/education-email";
 
-export const dynamic='force-dynamic';
+export const dynamic = "force-dynamic";
 
-async function guard(){
-  if(!(await isAdmin())) return NextResponse.json({ok:false,error:'Administrator sign-in required.'},{status:401});
+async function guard() {
+  if (!(await isAdmin()))
+    return NextResponse.json(
+      { ok: false, error: "Administrator sign-in required." },
+      { status: 401 },
+    );
   return null;
 }
 
-export async function GET(){
-  const denied=await guard(); if(denied) return denied;
-  try{
-    const sql=getEducationSql();
-    const [courses,classes,years,lecturers,offerings]=await Promise.all([
+export async function GET() {
+  const denied = await guard();
+  if (denied) return denied;
+  try {
+    const sql = getEducationSql();
+    const [courses, classes, years, lecturers, offerings] = await Promise.all([
       sql`select id,code,title from edu_courses where active=true order by code`,
       sql`select id,name,code,level,academic_year_id from edu_classes order by name`,
       sql`select id,name,is_active from edu_academic_years order by starts_on desc nulls last,name desc`,
@@ -28,63 +34,152 @@ export async function GET(){
           join edu_classes cl on cl.id=o.class_id
           join edu_academic_years y on y.id=o.academic_year_id
           left join edu_users u on u.id=o.lecturer_user_id
-          order by y.name desc,c.code,cl.name,o.term`
+          order by y.name desc,c.code,cl.name,o.term`,
     ]);
-    return NextResponse.json({ok:true,courses,classes,years,lecturers,offerings});
-  }catch(error){
-    console.error('Education offering list unavailable:',error);
-    return NextResponse.json({ok:false,error:'Education database setup is not ready yet.'},{status:503});
+    return NextResponse.json({
+      ok: true,
+      courses,
+      classes,
+      years,
+      lecturers,
+      offerings,
+    });
+  } catch (error) {
+    console.error("Education offering list unavailable:", error);
+    return NextResponse.json(
+      { ok: false, error: "Education database setup is not ready yet." },
+      { status: 503 },
+    );
   }
 }
 
-export async function POST(request){
-  const denied=await guard(); if(denied) return denied;
-  try{
-    const body=await request.json();
-    const courseId=body.courseId||null,classId=body.classId||null,academicYearId=body.academicYearId||null;
-    const lecturerId=body.lecturerId||null,term=String(body.term||'').trim().slice(0,80);
-    if(!courseId||!classId||!academicYearId||!term) return NextResponse.json({ok:false,error:'Course, class, academic year and term are required.'},{status:400});
-    const sql=getEducationSql();
-    const [courseRows,classRows,yearRows]=await Promise.all([
+export async function POST(request) {
+  const denied = await guard();
+  if (denied) return denied;
+  try {
+    const body = await request.json();
+    const courseId = body.courseId || null,
+      classId = body.classId || null,
+      academicYearId = body.academicYearId || null;
+    const lecturerId = body.lecturerId || null,
+      term = String(body.term || "")
+        .trim()
+        .slice(0, 80);
+    if (!courseId || !classId || !academicYearId || !term)
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Course, class, academic year and term are required.",
+        },
+        { status: 400 },
+      );
+    const sql = getEducationSql();
+    const [courseRows, classRows, yearRows] = await Promise.all([
       sql`select id from edu_courses where id=${courseId} and active=true limit 1`,
       sql`select academic_year_id from edu_classes where id=${classId} limit 1`,
-      sql`select id from edu_academic_years where id=${academicYearId} limit 1`
+      sql`select id from edu_academic_years where id=${academicYearId} limit 1`,
     ]);
-    if(!courseRows.length) return NextResponse.json({ok:false,error:'Selected course was not found or is inactive.'},{status:404});
-    if(!classRows?.[0]) return NextResponse.json({ok:false,error:'Selected class was not found.'},{status:404});
-    if(!yearRows.length) return NextResponse.json({ok:false,error:'Selected academic year was not found.'},{status:404});
-    if(String(classRows[0].academic_year_id)!==String(academicYearId)) return NextResponse.json({ok:false,error:'The selected class belongs to a different academic year.'},{status:400});
-    if(lecturerId){
-      const lecturerRows=await sql`select id from edu_users where id=${lecturerId} and role='lecturer' and status='active' limit 1`;
-      if(!lecturerRows.length) return NextResponse.json({ok:false,error:'Selected lecturer was not found or is not active.'},{status:400});
+    if (!courseRows.length)
+      return NextResponse.json(
+        { ok: false, error: "Selected course was not found or is inactive." },
+        { status: 404 },
+      );
+    if (!classRows?.[0])
+      return NextResponse.json(
+        { ok: false, error: "Selected class was not found." },
+        { status: 404 },
+      );
+    if (!yearRows.length)
+      return NextResponse.json(
+        { ok: false, error: "Selected academic year was not found." },
+        { status: 404 },
+      );
+    if (String(classRows[0].academic_year_id) !== String(academicYearId))
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "The selected class belongs to a different academic year.",
+        },
+        { status: 400 },
+      );
+    if (lecturerId) {
+      const lecturerRows =
+        await sql`select id from edu_users where id=${lecturerId} and role='lecturer' and status='active' limit 1`;
+      if (!lecturerRows.length)
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Selected lecturer was not found or is not active.",
+          },
+          { status: 400 },
+        );
     }
-    const rows=await sql`
+    const rows = await sql`
       insert into edu_course_offerings (course_id,class_id,academic_year_id,lecturer_user_id,term)
       values (${courseId},${classId},${academicYearId},${lecturerId},${term})
       on conflict (course_id,class_id,academic_year_id,term)
       do update set lecturer_user_id=excluded.lecturer_user_id
       returning id,course_id,class_id,academic_year_id,lecturer_user_id,term
     `;
-    const offering=rows[0];
-    await sql`insert into edu_audit_logs(action,entity_type,entity_id,metadata) values('admin_course_offering_saved','course_offering',${String(offering.id)},${JSON.stringify({source:'education_admin',courseId,classId,academicYearId,lecturerId:lecturerId||null,term})}::jsonb)`;
-    return NextResponse.json({ok:true,offering});
-  }catch(error){
-    console.error('Education offering save unavailable:',error);
-    return NextResponse.json({ok:false,error:'Unable to save course offering.'},{status:503});
+    const offering = rows[0];
+    await sql`insert into edu_audit_logs(action,entity_type,entity_id,metadata) values('admin_course_offering_saved','course_offering',${String(offering.id)},${JSON.stringify({ source: "education_admin", courseId, classId, academicYearId, lecturerId: lecturerId || null, term })}::jsonb)`;
+    let email = null;
+    if (lecturerId) {
+      const details = (
+        await sql`select u.id,u.full_name,u.email,c.code,c.title,cl.name as class_name from edu_users u join edu_courses c on c.id=${courseId} join edu_classes cl on cl.id=${classId} where u.id=${lecturerId}`
+      )[0];
+      if (details)
+        email = await deliverEducationEmail({
+          recipients: [details],
+          title: `Course assigned: ${details.code}`,
+          message: `You have been assigned to teach ${details.title} for ${details.class_name}.`,
+          kind: "Course assignment",
+          course: details.code,
+          actionPath: "/education/lecturer",
+          eventId: `offering-${offering.id}-${lecturerId}`,
+        });
+    }
+    return NextResponse.json({ ok: true, offering, email });
+  } catch (error) {
+    console.error("Education offering save unavailable:", error);
+    return NextResponse.json(
+      { ok: false, error: "Unable to save course offering." },
+      { status: 503 },
+    );
   }
 }
 
-export async function DELETE(request){
-  const denied=await guard(); if(denied) return denied;
-  try{
-    const id=Number(new URL(request.url).searchParams.get('id'));if(!id)return NextResponse.json({ok:false,error:'Course offering is required.'},{status:400});
-    const sql=getEducationSql();
-    const offering=(await sql`select o.id,c.code,cl.name as class_name,o.term from edu_course_offerings o join edu_courses c on c.id=o.course_id join edu_classes cl on cl.id=o.class_id where o.id=${id} limit 1`)[0];
-    if(!offering)return NextResponse.json({ok:false,error:'Course offering not found.'},{status:404});
-    const files=await sql`select blob_pathname from edu_learning_materials where offering_id=${id} and blob_pathname is not null`;
+export async function DELETE(request) {
+  const denied = await guard();
+  if (denied) return denied;
+  try {
+    const id = Number(new URL(request.url).searchParams.get("id"));
+    if (!id)
+      return NextResponse.json(
+        { ok: false, error: "Course offering is required." },
+        { status: 400 },
+      );
+    const sql = getEducationSql();
+    const offering = (
+      await sql`select o.id,c.code,cl.name as class_name,o.term from edu_course_offerings o join edu_courses c on c.id=o.course_id join edu_classes cl on cl.id=o.class_id where o.id=${id} limit 1`
+    )[0];
+    if (!offering)
+      return NextResponse.json(
+        { ok: false, error: "Course offering not found." },
+        { status: 404 },
+      );
+    const files =
+      await sql`select blob_pathname from edu_learning_materials where offering_id=${id} and blob_pathname is not null`;
     await sql`delete from edu_course_offerings where id=${id}`;
-    await sql`insert into edu_audit_logs(action,entity_type,entity_id,metadata) values('admin_course_offering_deleted','course_offering',${String(id)},${JSON.stringify({code:offering.code,className:offering.class_name,term:offering.term})}::jsonb)`;
-    if(educationBlobConfigured()&&files.length)await Promise.allSettled(files.map(file=>del(file.blob_pathname)));
-    return NextResponse.json({ok:true});
-  }catch(error){console.error('Education offering delete unavailable:',error);return NextResponse.json({ok:false,error:'Unable to remove course offering.'},{status:503});}
+    await sql`insert into edu_audit_logs(action,entity_type,entity_id,metadata) values('admin_course_offering_deleted','course_offering',${String(id)},${JSON.stringify({ code: offering.code, className: offering.class_name, term: offering.term })}::jsonb)`;
+    if (educationBlobConfigured() && files.length)
+      await Promise.allSettled(files.map((file) => del(file.blob_pathname)));
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Education offering delete unavailable:", error);
+    return NextResponse.json(
+      { ok: false, error: "Unable to remove course offering." },
+      { status: 503 },
+    );
+  }
 }

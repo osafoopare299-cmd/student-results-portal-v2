@@ -1,20 +1,27 @@
-import { NextResponse } from 'next/server';
-import { isAdmin } from '../../../../../lib/admin-auth';
-import { getEducationSql } from '../../../../../lib/db';
-import { ensureEducationResultReleaseSchema } from '../../../../../lib/education-results-schema';
+import { NextResponse } from "next/server";
+import { isAdmin } from "../../../../../lib/admin-auth";
+import { getEducationSql } from "../../../../../lib/db";
+import { ensureEducationResultReleaseSchema } from "../../../../../lib/education-results-schema";
+import { deliverEducationEmail } from "../../../../../lib/education-email";
 
-export const dynamic='force-dynamic';
+export const dynamic = "force-dynamic";
 
-async function guard(){
-  if(!(await isAdmin()))return NextResponse.json({ok:false,error:'Administrator sign-in required.'},{status:401});
+async function guard() {
+  if (!(await isAdmin()))
+    return NextResponse.json(
+      { ok: false, error: "Administrator sign-in required." },
+      { status: 401 },
+    );
   return null;
 }
 
-export async function GET(){
-  const denied=await guard();if(denied)return denied;
-  try{
-    const sql=getEducationSql();await ensureEducationResultReleaseSchema(sql);
-    const rows=await sql`
+export async function GET() {
+  const denied = await guard();
+  if (denied) return denied;
+  try {
+    const sql = getEducationSql();
+    await ensureEducationResultReleaseSchema(sql);
+    const rows = await sql`
       select t.id as attempt_id,t.score,t.feedback,t.marked_at,t.released_at,t.released_by,
              u.full_name as student_name,u.email as student_email,
              a.id as assessment_id,a.title as assessment_title,a.assessment_type,a.max_score,
@@ -32,42 +39,130 @@ export async function GET(){
       order by coalesce(t.released_at,t.marked_at) desc nulls last,t.id desc
       limit 500
     `;
-    return NextResponse.json({ok:true,results:rows});
-  }catch(error){console.error('Admin education results unavailable:',error);return NextResponse.json({ok:false,error:'Unable to load Education results publication queue.'},{status:503});}
+    return NextResponse.json({ ok: true, results: rows });
+  } catch (error) {
+    console.error("Admin education results unavailable:", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Unable to load Education results publication queue.",
+      },
+      { status: 503 },
+    );
+  }
 }
 
-export async function POST(request){
-  const denied=await guard();if(denied)return denied;
-  try{
-    const b=await request.json(),sql=getEducationSql();await ensureEducationResultReleaseSchema(sql);
-    if(b.action==='release-assessment'||b.action==='withdraw-assessment'){
-      const assessmentId=Number(b.assessmentId);
-      if(!Number.isFinite(assessmentId))return NextResponse.json({ok:false,error:'A valid assessment is required.'},{status:400});
-      const assessment=(await sql`select id,title from edu_assessments where id=${assessmentId} limit 1`)[0];
-      if(!assessment)return NextResponse.json({ok:false,error:'Assessment not found.'},{status:404});
-      if(b.action==='release-assessment'){
-        const changed=await sql`update edu_assessment_attempts set released_at=coalesce(released_at,now()) where assessment_id=${assessmentId} and status='marked' and released_at is null returning id`;
-        await sql`insert into edu_audit_logs (action,entity_type,entity_id,metadata) values ('assessment_results_batch_released_by_admin','edu_assessment',${String(assessmentId)},${JSON.stringify({assessmentTitle:assessment.title,count:changed.length,source:'education_admin'})}::jsonb)`;
-        return NextResponse.json({ok:true,released:true,count:changed.length});
+export async function POST(request) {
+  const denied = await guard();
+  if (denied) return denied;
+  try {
+    const b = await request.json(),
+      sql = getEducationSql();
+    await ensureEducationResultReleaseSchema(sql);
+    if (
+      b.action === "release-assessment" ||
+      b.action === "withdraw-assessment"
+    ) {
+      const assessmentId = Number(b.assessmentId);
+      if (!Number.isFinite(assessmentId))
+        return NextResponse.json(
+          { ok: false, error: "A valid assessment is required." },
+          { status: 400 },
+        );
+      const assessment = (
+        await sql`select id,title from edu_assessments where id=${assessmentId} limit 1`
+      )[0];
+      if (!assessment)
+        return NextResponse.json(
+          { ok: false, error: "Assessment not found." },
+          { status: 404 },
+        );
+      if (b.action === "release-assessment") {
+        const changed =
+          await sql`update edu_assessment_attempts set released_at=coalesce(released_at,now()) where assessment_id=${assessmentId} and status='marked' and released_at is null returning id,student_user_id`;
+        await sql`insert into edu_audit_logs (action,entity_type,entity_id,metadata) values ('assessment_results_batch_released_by_admin','edu_assessment',${String(assessmentId)},${JSON.stringify({ assessmentTitle: assessment.title, count: changed.length, source: "education_admin" })}::jsonb)`;
+        const details = (
+          await sql`select a.title,c.code,c.title as course_title from edu_assessments a join edu_course_offerings o on o.id=a.offering_id join edu_courses c on c.id=o.course_id where a.id=${assessmentId}`
+        )[0];
+        const recipients = changed.length
+          ? await sql`select u.id,u.full_name,u.email from edu_users u where u.id=any(${changed.map((row) => row.student_user_id)})`
+          : [];
+        const email = details
+          ? await deliverEducationEmail({
+              recipients,
+              title: `Result released: ${details.title}`,
+              message: `Your result for ${details.title} in ${details.course_title} is now available.`,
+              kind: "Result update",
+              course: details.code,
+              actionPath: "/education/student/results",
+              eventId: `batch-${assessmentId}`,
+            })
+          : null;
+        return NextResponse.json({
+          ok: true,
+          released: true,
+          count: changed.length,
+          email,
+        });
       }
-      const changed=await sql`update edu_assessment_attempts set released_at=null,released_by=null where assessment_id=${assessmentId} and status='marked' and released_at is not null returning id`;
-      await sql`insert into edu_audit_logs (action,entity_type,entity_id,metadata) values ('assessment_results_batch_release_withdrawn_by_admin','edu_assessment',${String(assessmentId)},${JSON.stringify({assessmentTitle:assessment.title,count:changed.length,source:'education_admin'})}::jsonb)`;
-      return NextResponse.json({ok:true,released:false,count:changed.length});
+      const changed =
+        await sql`update edu_assessment_attempts set released_at=null,released_by=null where assessment_id=${assessmentId} and status='marked' and released_at is not null returning id`;
+      await sql`insert into edu_audit_logs (action,entity_type,entity_id,metadata) values ('assessment_results_batch_release_withdrawn_by_admin','edu_assessment',${String(assessmentId)},${JSON.stringify({ assessmentTitle: assessment.title, count: changed.length, source: "education_admin" })}::jsonb)`;
+      return NextResponse.json({
+        ok: true,
+        released: false,
+        count: changed.length,
+      });
     }
-    const attemptId=Number(b.attemptId);
-    if(!Number.isFinite(attemptId))return NextResponse.json({ok:false,error:'A valid result is required.'},{status:400});
-    const attempt=(await sql`select id,status,released_at,assessment_id from edu_assessment_attempts where id=${attemptId} limit 1`)[0];
-    if(!attempt||attempt.status!=='marked')return NextResponse.json({ok:false,error:'Finalized result not found.'},{status:404});
-    if(b.action==='release'){
-      await sql`update edu_assessment_attempts set released_at=coalesce(released_at,now()) where id=${attemptId}`;
-      await sql`insert into edu_audit_logs (action,entity_type,entity_id,metadata) values ('assessment_result_released_by_admin','edu_assessment_attempt',${String(attemptId)},${JSON.stringify({assessmentId:String(attempt.assessment_id),source:'education_admin'})}::jsonb)`;
-      return NextResponse.json({ok:true,released:true});
+    const attemptId = Number(b.attemptId);
+    if (!Number.isFinite(attemptId))
+      return NextResponse.json(
+        { ok: false, error: "A valid result is required." },
+        { status: 400 },
+      );
+    const attempt = (
+      await sql`select id,status,released_at,assessment_id from edu_assessment_attempts where id=${attemptId} limit 1`
+    )[0];
+    if (!attempt || attempt.status !== "marked")
+      return NextResponse.json(
+        { ok: false, error: "Finalized result not found." },
+        { status: 404 },
+      );
+    if (b.action === "release") {
+      const changed = (
+        await sql`update edu_assessment_attempts set released_at=coalesce(released_at,now()) where id=${attemptId} returning student_user_id`
+      )[0];
+      await sql`insert into edu_audit_logs (action,entity_type,entity_id,metadata) values ('assessment_result_released_by_admin','edu_assessment_attempt',${String(attemptId)},${JSON.stringify({ assessmentId: String(attempt.assessment_id), source: "education_admin" })}::jsonb)`;
+      const details = (
+        await sql`select u.id,u.full_name,u.email,a.title,c.code,c.title as course_title from edu_users u join edu_assessments a on a.id=${attempt.assessment_id} join edu_course_offerings o on o.id=a.offering_id join edu_courses c on c.id=o.course_id where u.id=${changed.student_user_id}`
+      )[0];
+      const email = details
+        ? await deliverEducationEmail({
+            recipients: [details],
+            title: `Result released: ${details.title}`,
+            message: `Your result for ${details.title} in ${details.course_title} is now available.`,
+            kind: "Result update",
+            course: details.code,
+            actionPath: "/education/student/results",
+            eventId: attemptId,
+          })
+        : null;
+      return NextResponse.json({ ok: true, released: true, email });
     }
-    if(b.action==='withdraw-release'){
+    if (b.action === "withdraw-release") {
       await sql`update edu_assessment_attempts set released_at=null,released_by=null where id=${attemptId}`;
-      await sql`insert into edu_audit_logs (action,entity_type,entity_id,metadata) values ('assessment_result_release_withdrawn_by_admin','edu_assessment_attempt',${String(attemptId)},${JSON.stringify({assessmentId:String(attempt.assessment_id),source:'education_admin'})}::jsonb)`;
-      return NextResponse.json({ok:true,released:false});
+      await sql`insert into edu_audit_logs (action,entity_type,entity_id,metadata) values ('assessment_result_release_withdrawn_by_admin','edu_assessment_attempt',${String(attemptId)},${JSON.stringify({ assessmentId: String(attempt.assessment_id), source: "education_admin" })}::jsonb)`;
+      return NextResponse.json({ ok: true, released: false });
     }
-    return NextResponse.json({ok:false,error:'Unknown publication action.'},{status:400});
-  }catch(error){console.error('Admin education result publication unavailable:',error);return NextResponse.json({ok:false,error:'Unable to update Education result publication.'},{status:503});}
+    return NextResponse.json(
+      { ok: false, error: "Unknown publication action." },
+      { status: 400 },
+    );
+  } catch (error) {
+    console.error("Admin education result publication unavailable:", error);
+    return NextResponse.json(
+      { ok: false, error: "Unable to update Education result publication." },
+      { status: 503 },
+    );
+  }
 }

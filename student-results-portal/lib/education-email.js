@@ -9,7 +9,10 @@ const escapeHtml = (value) =>
 function config() {
   const apiKey = process.env.RESEND_API_KEY,
     from = process.env.RESEND_FROM_EMAIL;
+  const productionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL;
   const appUrl = (
+    process.env.EDUCATION_APP_URL ||
+    (productionHost ? `https://${productionHost}` : "") ||
     process.env.APP_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
     ""

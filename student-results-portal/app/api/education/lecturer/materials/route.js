@@ -42,7 +42,7 @@ export async function GET() {
     const offerings =
       await sql`select o.id,c.code,c.title,cl.name as class_name,y.name as academic_year,o.term from edu_course_offerings o join edu_courses c on c.id=o.course_id join edu_classes cl on cl.id=o.class_id join edu_academic_years y on y.id=o.academic_year_id where o.lecturer_user_id=${access.user.id} order by y.name desc,c.code`;
     const materials =
-      await sql`select m.id,m.offering_id,m.title,m.description,m.material_type,m.resource_url,m.content_text,m.is_offline_available,m.is_ai_approved,m.published_at,m.created_at,m.blob_pathname,m.original_filename,m.file_content_type,m.file_size_bytes,c.code,c.title as course_title,cl.name as class_name from edu_learning_materials m join edu_course_offerings o on o.id=m.offering_id join edu_courses c on c.id=o.course_id join edu_classes cl on cl.id=o.class_id where m.created_by=${access.user.id} order by m.created_at desc limit 200`;
+      await sql`select m.id,m.offering_id,m.title,m.description,m.material_type,m.resource_url,m.content_text,m.is_offline_available,m.is_ai_approved,m.ai_processing_status,m.ai_processing_error,m.ai_processed_at,m.published_at,m.created_at,m.blob_pathname,m.original_filename,m.file_content_type,m.file_size_bytes,c.code,c.title as course_title,cl.name as class_name from edu_learning_materials m join edu_course_offerings o on o.id=m.offering_id join edu_courses c on c.id=o.course_id join edu_classes cl on cl.id=o.class_id where m.created_by=${access.user.id} order by m.created_at desc limit 200`;
     return NextResponse.json({
       ok: true,
       offerings,

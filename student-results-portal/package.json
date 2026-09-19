@@ -11,6 +11,7 @@
     "@ai-sdk/gateway": "^3.0.0",
     "@neondatabase/auth": "0.5.0-beta",
     "@neondatabase/serverless": "^1.0.1",
+    "@vercel/oidc": "^3.8.8",
     "@vercel/blob": "latest",
     "ai": "^7.0.0",
     "lucide-react": "^0.468.0",

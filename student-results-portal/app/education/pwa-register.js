@@ -1,5 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { UserRound } from 'lucide-react';
+import EducationLogoutButton from './logout-button';
+import styles from './pwa-register.module.css';
 
 async function clearPrivateEducationData(){
   try{
@@ -17,6 +22,8 @@ async function clearPrivateEducationData(){
 }
 
 export default function PWARegister(){
+  const pathname=usePathname();
+  const role=pathname?.startsWith('/education/student')?'student':pathname?.startsWith('/education/lecturer')?'lecturer':pathname==='/education/admin'||pathname?.startsWith('/education/admin/')?'admin':null;
   const [installEvent,setInstallEvent]=useState(null);
   const [installed,setInstalled]=useState(false);
   const [online,setOnline]=useState(true);
@@ -63,10 +70,17 @@ export default function PWARegister(){
     setInstallEvent(null);
   }
 
-  return <div aria-label="Education app status" style={{position:'relative',zIndex:1,display:'flex',alignItems:'center',justifyContent:'flex-end',gap:8,padding:'8px 12px',minHeight:44,boxSizing:'border-box',borderBottom:'1px solid #dce9e3',background:'#f8fcfa',fontFamily:'Arial,sans-serif'}}>
-    <div role="status" style={{display:'flex',alignItems:'center',gap:7,border:`1px solid ${online?'#b9d9cc':'#e8c98e'}`,background:online?'#edf8f3':'#fff5df',color:online?'#176a4c':'#8a5700',padding:'9px 12px',borderRadius:999,boxShadow:'0 8px 24px rgba(19,61,43,.12)',fontSize:11,fontWeight:850,letterSpacing:'.08em',whiteSpace:'nowrap'}}>
-      <span aria-hidden="true" style={{width:7,height:7,borderRadius:'50%',background:online?'#1b9b68':'#d38316'}}/>{online?'ONLINE':'OFFLINE'}
+  return <div aria-label="Education app status" className={styles.bar}>
+    <div role="status" className={`${styles.status} ${online?styles.online:styles.offline}`}>
+      <span aria-hidden="true" className={styles.dot}/>{online?'Online':'Offline'}
     </div>
-    {!installed&&<button type="button" onClick={install} style={{border:0,background:'#0d6848',color:'#fff',padding:'10px 14px',borderRadius:999,boxShadow:'0 8px 24px rgba(19,61,43,.18)',fontSize:12,fontWeight:850,cursor:'pointer',whiteSpace:'nowrap'}}>Install app</button>}
+    {!installed&&<button type="button" onClick={install} className={styles.install}>Install app</button>}
+    {role&&<details className={styles.profile}>
+      <summary aria-label={role==='student'?'My Profile menu':'Account menu'}><UserRound size={16}/><span>{role==='student'?'My Profile':'Account'}</span></summary>
+      <div className={styles.dropdown}>
+        {role==='student'&&<Link href="/education/student/profile">My Profile</Link>}
+        <EducationLogoutButton admin={role==='admin'} menu/>
+      </div>
+    </details>}
   </div>;
 }

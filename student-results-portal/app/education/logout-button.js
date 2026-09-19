@@ -41,7 +41,7 @@ export default function EducationLogoutButton({ admin = false, menu = false, cla
         borderRadius: 12,
         padding: '12px 13px',
         background: 'transparent',
-        color: '#acd2c4',
+        color: '#174232',
         fontFamily: 'inherit',
         fontSize: 13,
         fontWeight: 650,

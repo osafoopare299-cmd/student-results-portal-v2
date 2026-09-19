@@ -8,6 +8,7 @@ import {getEducationUser} from '../../../../../../../lib/education-session';
 import {getEducationSql} from '../../../../../../../lib/db';
 import {ensureEducationMaterialFileSchema,educationBlobConfigured} from '../../../../../../../lib/education-material-files';
 import {ensureEducationAiMaterialSchema,chunkEducationText} from '../../../../../../../lib/education-ai-materials';
+import {getEducationGatewayToken} from '../../../../../../../lib/education-ai-gateway';
 
 export const dynamic='force-dynamic';
 export const maxDuration=300;
@@ -22,7 +23,6 @@ const IMAGE_TYPES=new Set(['image/jpeg','image/png','image/gif','image/webp']);
 const AUDIO_VIDEO_LIMIT=25*1024*1024;
 const OCR_LIMIT=10*1024*1024;
 
-function gatewayToken(){return process.env.AI_GATEWAY_API_KEY||process.env.VERCEL_OIDC_TOKEN;}
 function stripHtml(value){return String(value||'').replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/\s+/g,' ').trim();}
 function safeExternalUrl(raw){
  const url=new URL(String(raw||''));if(url.protocol!=='https:')throw new Error('Only HTTPS learning links can be processed.');
@@ -41,13 +41,13 @@ async function extractOffice(bytes){const {parseOffice}=await import('officepars
 function extractSpreadsheet(bytes){const book=XLSX.read(bytes,{type:'buffer'});return book.SheetNames.map(name=>`[${name}]\n${XLSX.utils.sheet_to_csv(book.Sheets[name])}`).join('\n\n').trim();}
 async function extractTranscript(bytes){
  if(bytes.length>AUDIO_VIDEO_LIMIT)throw new Error('This audio/video is over 25 MB. Upload a transcript or a shorter recording for AI processing.');
- if(!gatewayToken())throw new Error('AI transcription is not configured on this deployment.');
+ if(!await getEducationGatewayToken())throw new Error('AI transcription is not configured on this deployment.');
  const result=await transcribe({model:gateway.transcriptionModel(process.env.EDUCATION_TRANSCRIPTION_MODEL||'fish-audio/transcribe-1'),audio:bytes});
  return String(result?.text||'').trim();
 }
 async function extractImageText(bytes,type){
  if(bytes.length>OCR_LIMIT)throw new Error('This image is over 10 MB and cannot be processed for AI.');
- const token=gatewayToken();if(!token)throw new Error('AI image text extraction is not configured on this deployment.');
+ const token=await getEducationGatewayToken();if(!token)throw new Error('AI image text extraction is not configured on this deployment.');
  const response=await fetch('https://ai-gateway.vercel.sh/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.EDUCATION_OCR_MODEL||'openai/gpt-5.4',temperature:0,messages:[{role:'user',content:[{type:'text',text:'Extract all readable educational text from this image. Preserve headings and lists. Return only the extracted text.'},{type:'image_url',image_url:{url:`data:${type};base64,${bytes.toString('base64')}`}}]}]})});
  if(!response.ok)throw new Error('AI image text extraction failed.');
  const data=await response.json();return String(data?.choices?.[0]?.message?.content||'').trim();

@@ -1,11 +1,32 @@
 const escapeHtml = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+// This project domain has the Education routes. The unscoped .vercel.app
+// domain currently serves an older deployment and returns 404 for them.
+const educationOrigin = "https://student-results-portal-mobile-v2-osafoopare299-1595s-projects.vercel.app";
 
 function config() {
   const apiKey = process.env.RESEND_API_KEY;
   const configuredFrom = process.env.RESEND_FROM_EMAIL;
   const from = configuredFrom && configuredFrom.includes("<") ? configuredFrom : configuredFrom ? `Dropare Education <${configuredFrom}>` : configuredFrom;
-  const appUrl = (process.env.EDUCATION_APP_URL || "https://student-results-portal-mobile-v2-osafoopare299-1595s-projects.vercel.app").replace(/\/$/, "");
-  return { apiKey, from, appUrl, ready: Boolean(apiKey && from && appUrl) };
+  return { apiKey, from, ready: Boolean(apiKey && from) };
+}
+
+export async function resolveEducationEmailOrigin() {
+  const configured = process.env.EDUCATION_APP_URL;
+  if (configured) {
+    try {
+      const url = new URL(configured);
+      if (url.protocol === "https:" && url.origin !== educationOrigin) {
+        const response = await fetch(`${url.origin}/education/login`, {
+          method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(4000),
+        });
+        if (response.ok) return url.origin;
+        console.warn(`Education email origin returned ${response.status}; using the working project domain.`);
+      }
+    } catch (error) {
+      console.warn("Education email origin could not be reached; using the working project domain.", error);
+    }
+  }
+  return educationOrigin;
 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -41,9 +62,10 @@ async function sendOne({ apiKey, from, person, subject, text, html, idempotencyK
 }
 
 export async function sendEducationUpdateEmails({ recipients, title, message, kind = "Platform update", course = "", actionPath = "/education", eventId = "update" }) {
-  const { apiKey, from, appUrl, ready } = config();
+  const { apiKey, from, ready } = config();
   const people = [...new Map((recipients || []).filter((person) => person?.email).map((person) => [String(person.email).toLowerCase(), person])).values()];
   if (!ready || !people.length) return { sent: 0, failed: 0, skipped: people.length, configured: ready };
+  const appUrl = await resolveEducationEmailOrigin();
   const url = `${appUrl}${actionPath.startsWith("/") ? actionPath : `/${actionPath}`}`;
   const subject = `${course ? `${course}: ` : ""}${title}`;
   const results = [];

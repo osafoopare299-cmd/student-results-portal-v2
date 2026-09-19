@@ -2,7 +2,25 @@
   .page { overflow-x: hidden; }
   .grid { grid-template-columns: minmax(0, 1fr); }
   .sources { min-width: 0; }
-  .chat { height: auto; min-height: 0; max-height: none; overflow: visible; }
-  .chatBody { overflow: visible; overscroll-behavior: auto; touch-action: pan-y; }
-  .bubble { overflow-wrap: anywhere; }
+  .chat {
+    height: min(78dvh, 760px);
+    min-height: min(480px, 78dvh);
+    max-height: none;
+    overflow: hidden;
+    position: relative;
+    top: auto;
+  }
+  .chatBody {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: auto;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+  .bubble { min-width: 0; overflow-wrap: anywhere; }
+  .sources select { width: 100%; min-width: 0; }
+  .sourceList { max-height: 260px; overflow-y: auto; overscroll-behavior-y: contain; }
+  .composer { position: relative; bottom: auto; }
+  .composer textarea { min-width: 0; }
 }

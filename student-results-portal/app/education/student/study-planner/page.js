@@ -159,6 +159,7 @@ export default function StudyPlannerPage() {
                 Plan revision, assignments and course study sessions in one
                 private workspace.
               </p>
+              <a href="#new-study-task" className={styles.addTaskLink}>Add a study task</a>
             </div>
           </div>
         </section>
@@ -185,7 +186,7 @@ export default function StudyPlannerPage() {
         </section>
 
         <section className={styles.plannerGrid}>
-          <form className={styles.form} onSubmit={addTask} style={card}>
+          <form id="new-study-task" className={styles.form} onSubmit={addTask} style={card}>
             <h2 style={{ marginTop: 0 }}>Add study task</h2>
             <label style={{ display: "grid", gap: 6, marginBottom: 12 }}>
               <span style={{ fontWeight: 800, fontSize: 13 }}>Task</span>
@@ -273,6 +274,7 @@ export default function StudyPlannerPage() {
           <div className={styles.taskColumn}>
             <section className={styles.taskCard} style={card}>
               <h2 style={{ marginTop: 0 }}>Upcoming study</h2>
+              <p className={styles.sectionHint}>Due soonest first. Overdue tasks are highlighted.</p>
               {loading ? (
                 <p>Loading planner…</p>
               ) : pending.length === 0 ? (

@@ -1,0 +1,14 @@
+.bar{position:relative;z-index:40;display:flex;align-items:center;justify-content:flex-end;gap:7px;padding:5px 12px;min-height:42px;box-sizing:border-box;border-bottom:1px solid #dce9e3;background:#f8fcfa;font-family:Arial,sans-serif}
+.status,.install,.profile summary{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:30px;border-radius:10px;padding:5px 10px;box-sizing:border-box;white-space:nowrap;font-size:12px;font-weight:800}
+.status{border:1px solid #b9d9cc;background:#edf8f3;color:#176a4c}
+.offline{border-color:#e8c98e;background:#fff5df;color:#8a5700}
+.dot{width:7px;height:7px;border-radius:50%;background:#1b9b68}
+.offline .dot{background:#d38316}
+.install{border:0;background:#0d6848;color:#fff;cursor:pointer}
+.profile{position:relative}
+.profile summary{border:1px solid #cfe1d8;background:#fff;color:#164d36;cursor:pointer;list-style:none}
+.profile summary::-webkit-details-marker{display:none}
+.dropdown{position:absolute;right:0;top:calc(100% + 7px);width:180px;padding:6px;border:1px solid #dce9e3;border-radius:12px;background:#fff;box-shadow:0 12px 30px #123b2c24;display:grid;gap:2px}
+.dropdown a{display:block;padding:11px 13px;border-radius:9px;text-decoration:none;font-size:13px;font-weight:750;color:#174232}
+.dropdown a:hover,.dropdown button:hover{background:#edf8f3!important}
+@media(max-width:420px){.bar{padding:4px 8px;gap:5px}.status,.install,.profile summary{padding:5px 8px;font-size:11px}}

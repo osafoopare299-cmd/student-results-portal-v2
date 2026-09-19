@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isAdmin } from '../../../../../lib/admin-auth';
 import { getEducationSql } from '../../../../../lib/db';
 import { educationBlobConfigured } from '../../../../../lib/education-material-files';
+import { getEducationGatewayToken } from '../../../../../lib/education-ai-gateway';
 
 export const dynamic='force-dynamic';
 
@@ -21,7 +22,7 @@ export async function GET(){
     const missingTables=CORE_TABLES.filter(name=>!present.has(name));
     const dbPing=await sql`select now() as database_time`;
     const blobConfigured=educationBlobConfigured();
-    const aiConfigured=Boolean(process.env.AI_GATEWAY_API_KEY||process.env.VERCEL_OIDC_TOKEN);
+    const aiConfigured=Boolean(await getEducationGatewayToken());
     const educationDatabaseConfigured=Boolean(process.env.EDUCATION_DATABASE_URL);
     const checks={
       educationDatabaseConfigured,

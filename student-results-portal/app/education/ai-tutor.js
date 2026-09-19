@@ -759,7 +759,7 @@ export default function AITutor() {
               ))}
             </select>
           </label>
-          <div className={styles.sourceList}>
+          <div className={`${styles.sourceList} ${mobile.sourceList}`}>
             {visibleSources.map((item) => (
               <article key={item.id}>
                 <span className={styles.fileIcon}>
@@ -1303,7 +1303,7 @@ export default function AITutor() {
               ))
             )}
           </div>
-          <div className={styles.composer}>
+          <div className={`${styles.composer} ${mobile.composer}`}>
             <textarea
               value={question}
               onChange={(e) => setQuestion(e.target.value)}

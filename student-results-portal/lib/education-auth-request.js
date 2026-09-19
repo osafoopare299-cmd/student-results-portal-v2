@@ -1,3 +1,5 @@
+import { NextRequest } from 'next/server';
+
 const DEFAULT_EDUCATION_AUTH_ORIGIN = 'https://dropare.site';
 
 function canonicalEducationAuthOrigin() {
@@ -42,5 +44,11 @@ export function normalizeEducationAuthProxyRequest(request) {
     canonicalOrigin,
   });
 
-  return new Request(request, { headers });
+  return new NextRequest(request.url, {
+    method: request.method,
+    headers,
+    body: request.body,
+    duplex: 'half',
+    signal: request.signal,
+  });
 }

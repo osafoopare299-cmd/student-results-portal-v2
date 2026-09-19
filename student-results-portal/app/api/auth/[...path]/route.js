@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getEducationAuth } from '../../../../lib/education-auth';
+import { normalizeEducationAuthProxyRequest } from '../../../../lib/education-auth-request';
 
 function unavailable() {
   return NextResponse.json(
@@ -17,5 +18,5 @@ export async function GET(request, context) {
 export async function POST(request, context) {
   const auth = getEducationAuth();
   if (!auth) return unavailable();
-  return auth.handler().POST(request, context);
+  return auth.handler().POST(normalizeEducationAuthProxyRequest(request), context);
 }

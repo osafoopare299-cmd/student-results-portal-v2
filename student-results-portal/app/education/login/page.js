@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Eye, EyeOff, GraduationCap, LockKeyhole, Mail, ShieldCheck, Stethoscope, UserPlus } from 'lucide-react';
 import { educationAuthClient } from '../../../lib/education-auth-client';
-import { signInEducationAccount } from './actions';
 import styles from './page.module.css';
 
 export default function EducationLogin(){
@@ -54,8 +53,8 @@ export default function EducationLogin(){
         return;
       }
 
-      const result=await signInEducationAccount(email, password);
-      if (!result?.ok) throw new Error(result?.error || 'Unable to sign in.');
+      const result=await educationAuthClient.signIn.email({ email, password });
+      if (result?.error) throw new Error(result.error.message || 'Invalid email or password.');
       await resolveRole();
     } catch (err) {
       setError(err?.message || 'Unable to continue. Please try again.');

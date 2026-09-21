@@ -12,6 +12,8 @@ export async function ensureLiveClassroomSchema(sql) {
     updated_at timestamptz not null default now()
   )`;
   await sql`create index if not exists edu_live_classes_offering_idx on edu_live_classes(offering_id,starts_at desc)`;
+  await sql`alter table edu_live_classes add column if not exists host_user_id bigint references edu_users(id)`;
+  await sql`update edu_live_classes set host_user_id=created_by where host_user_id is null`;
   await sql`create table if not exists edu_live_attendance (
     id bigserial primary key,
     live_class_id bigint not null references edu_live_classes(id) on delete cascade,

@@ -59,6 +59,7 @@ const workspaces = {
       ['Result Publication','Review finalized Education marks and release them to students',BarChart3,'/education/admin/results'],
       ['Database Setup','Verify isolation and initialize education tables',ShieldCheck,'/education/admin/setup'],
       ['Platform Analytics','Performance, attendance and activity summaries',BarChart3,'/education/admin/analytics'],
+      ['Live Classroom','Schedule and host video classes across all courses',Video,'/education/admin/live-classroom'],
     ],
   },
 };
@@ -94,7 +95,7 @@ export default function Workspace({ role, user=null, dashboard=null }) {
         {role==='student' && <Link href="/education/student/flashcards"><Brain size={18}/> Flashcards</Link>}
         {role==='student' && <Link href="/education/student/study-rewards"><Flame size={18}/> Study Rewards</Link>}
         {timetableHref ? <Link href={timetableHref}><CalendarDays size={18}/> Timetable</Link> : <a><CalendarDays size={18}/> Timetable</a>}
-        {(role==='student'||role==='lecturer')&&<Link href={`/education/${role}/live-classroom`}><Video size={18}/> Live Classroom</Link>}
+        <Link href={`/education/${role}/live-classroom`}><Video size={18}/> Live Classroom</Link>
         {notificationsHref ? <Link href={notificationsHref}><Bell size={18}/> Notifications</Link> : <a><Bell size={18}/> Notifications</a>}
         {role==='student' && <Link href="/education/student/profile"><UserRound size={18}/> My Profile</Link>}
       </nav>

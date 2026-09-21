@@ -6,7 +6,7 @@ import {
   Activity, BarChart3, Bell, BookOpen, Brain, CalendarDays, CheckCircle2,
   ClipboardCheck, FileText, Flame, GraduationCap, LayoutDashboard, ListTodo, Menu,
   MessageSquareText, ShieldCheck, Sparkles, Stethoscope, UserCog, UserRound,
-  Wifi, X
+  Video, Wifi, X
 } from 'lucide-react';
 import styles from './page.module.css';
 
@@ -27,6 +27,7 @@ const workspaces = {
       ['Practice Analytics','Track AI practice scores, trends, strong topics and weak areas',Activity,'/education/student/practice-analytics'],
       ['Notifications','Results, assignments, timetable and learning updates',Bell,'/education/student/notifications'],
       ['Attendance','Class and rotation attendance summaries',CheckCircle2,'/education/student/attendance'],
+      ['Live Classroom','Join video classes, breakout rooms, chat and reactions',Video,'/education/student/live-classroom'],
       ['My Profile','View your academic profile, enrolments and contact details',UserRound,'/education/student/profile'],
     ],
   },
@@ -39,6 +40,7 @@ const workspaces = {
       ['Create Assessment','Build MCQ, written, viva/OSCE and practical assessments',ClipboardCheck,'/education/lecturer/assessments'],
       ['Marks & Results','Mark submissions, finalize scores and release results',BarChart3,'/education/lecturer/assessments'],
       ['Attendance','Create sessions and record attendance',CheckCircle2,'/education/lecturer/attendance'],
+      ['Live Classroom','Host video classes, screen sharing and breakout rooms',Video,'/education/lecturer/live-classroom'],
       ['Announcements','Create class updates and review notification activity',MessageSquareText,'/education/lecturer/notifications'],
       ['Class Analytics','Course performance, pass rates, attendance and marking backlog',Activity,'/education/lecturer/analytics'],
     ],
@@ -92,6 +94,7 @@ export default function Workspace({ role, user=null, dashboard=null }) {
         {role==='student' && <Link href="/education/student/flashcards"><Brain size={18}/> Flashcards</Link>}
         {role==='student' && <Link href="/education/student/study-rewards"><Flame size={18}/> Study Rewards</Link>}
         {timetableHref ? <Link href={timetableHref}><CalendarDays size={18}/> Timetable</Link> : <a><CalendarDays size={18}/> Timetable</a>}
+        {(role==='student'||role==='lecturer')&&<Link href={`/education/${role}/live-classroom`}><Video size={18}/> Live Classroom</Link>}
         {notificationsHref ? <Link href={notificationsHref}><Bell size={18}/> Notifications</Link> : <a><Bell size={18}/> Notifications</a>}
         {role==='student' && <Link href="/education/student/profile"><UserRound size={18}/> My Profile</Link>}
       </nav>

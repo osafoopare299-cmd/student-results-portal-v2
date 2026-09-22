@@ -51,9 +51,15 @@ export async function handlePostLiveClasses(request,role='lecturer',authenticate
       if(!offering)return NextResponse.json({ok:false,error:'Course offering not found.'},{status:404});
       if(!title||Number.isNaN(startsAt.getTime())||Number.isNaN(endsAt.getTime())||endsAt<=startsAt)return NextResponse.json({ok:false,error:'Provide a title and valid start/end time.'},{status:400});
       let hostUserId=access.user.id;
-      if(role==='admin'&&body.hostUserId){const host=(await sql`select id from edu_users where id=${Number(body.hostUserId)} and status='active' and role in ('admin','lecturer') limit 1`)[0];if(!host)return NextResponse.json({ok:false,error:'Selected host is not available.'},{status:400});hostUserId=host.id;}
+      if(role==='admin'){
+        if(!body.hostUserId)return NextResponse.json({ok:false,error:'Select a host for this live class.'},{status:400});
+        const host=(await sql`select id from edu_users where id=${Number(body.hostUserId)} and status='active' and role in ('admin','lecturer') limit 1`)[0];
+        if(!host)return NextResponse.json({ok:false,error:'Selected host is not available.'},{status:400});
+        hostUserId=host.id;
+      }
       const name=roomName(offering.code,offeringId),daily=await createDailyRoom({name,startsAt,endsAt});
-      const rows=await sql`insert into edu_live_classes (offering_id,title,starts_at,ends_at,daily_room_name,created_by,host_user_id) values (${offeringId},${title},${startsAt.toISOString()},${endsAt.toISOString()},${daily.name},${access.user.id},${hostUserId}) returning *`;
+      const createdBy=role==='admin'?hostUserId:access.user.id;
+      const rows=await sql`insert into edu_live_classes (offering_id,title,starts_at,ends_at,daily_room_name,created_by,host_user_id) values (${offeringId},${title},${startsAt.toISOString()},${endsAt.toISOString()},${daily.name},${createdBy},${hostUserId}) returning *`;
       return NextResponse.json({ok:true,liveClass:rows[0]});
     }
     if(body.action==='join'){

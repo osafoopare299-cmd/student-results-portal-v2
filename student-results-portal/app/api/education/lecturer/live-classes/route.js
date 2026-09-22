@@ -29,8 +29,8 @@ async function loadData(sql, userId, role) {
   return { offerings, classes: classes.map(x=>({...x,breakouts:breakouts.filter(b=>String(b.live_class_id)===String(x.id))})) };
 }
 
-export async function handleGetLiveClasses(role='lecturer') {
-  const access = await getEducationUser(role);
+export async function handleGetLiveClasses(role='lecturer', authenticatedAccess=null) {
+  const access = authenticatedAccess || await getEducationUser(role);
   if (!access.ok) return NextResponse.json({ok:false,error:`${role==='admin'?'Administrator':'Lecturer'} access required.`},{status:401});
   try {
     const sql=getEducationSql(); await ensureLiveClassroomSchema(sql);
@@ -40,8 +40,8 @@ export async function handleGetLiveClasses(role='lecturer') {
 
 export async function GET(){return handleGetLiveClasses('lecturer');}
 
-export async function handlePostLiveClasses(request,role='lecturer') {
-  const access=await getEducationUser(role);
+export async function handlePostLiveClasses(request,role='lecturer',authenticatedAccess=null) {
+  const access=authenticatedAccess || await getEducationUser(role);
   if(!access.ok)return NextResponse.json({ok:false,error:`${role==='admin'?'Administrator':'Lecturer'} access required.`},{status:401});
   try {
     const body=await request.json(),sql=getEducationSql(); await ensureLiveClassroomSchema(sql);

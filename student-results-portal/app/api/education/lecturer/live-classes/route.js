@@ -50,6 +50,7 @@ export async function handlePostLiveClasses(request,role='lecturer',authenticate
       const offering=role==='admin'?(await sql`select o.id,c.code from edu_course_offerings o join edu_courses c on c.id=o.course_id where o.id=${offeringId} limit 1`)[0]:(await sql`select o.id,c.code from edu_course_offerings o join edu_courses c on c.id=o.course_id where o.id=${offeringId} and o.lecturer_user_id=${access.user.id} limit 1`)[0];
       if(!offering)return NextResponse.json({ok:false,error:'Course offering not found.'},{status:404});
       if(!title||Number.isNaN(startsAt.getTime())||Number.isNaN(endsAt.getTime())||endsAt<=startsAt)return NextResponse.json({ok:false,error:'Provide a title and valid start/end time.'},{status:400});
+      if(endsAt.getTime()<=Date.now()+60000)return NextResponse.json({ok:false,error:'The class end time must be in the future.'},{status:400});
       let hostUserId=access.user.id;
       if(role==='admin'){
         if(!body.hostUserId)return NextResponse.json({ok:false,error:'Select a host for this live class.'},{status:400});

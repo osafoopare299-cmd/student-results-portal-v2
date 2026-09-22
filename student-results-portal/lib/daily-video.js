@@ -39,7 +39,6 @@ export async function createDailyRoom({ name, startsAt, endsAt }) {
         nbf: Math.max(0, start - 1800),
         exp: end + 1800,
         eject_at_room_exp: true,
-        max_participants: 50,
         enable_chat: true,
         enable_screenshare: true,
         enable_prejoin_ui: true,

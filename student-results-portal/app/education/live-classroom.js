@@ -19,7 +19,16 @@ export default function LiveClassroom({role}){
   async function create(e){e.preventDefault();try{await post({action:'create',...form,startsAt:new Date(`${form.startsAt}Z`).toISOString(),endsAt:new Date(`${form.endsAt}Z`).toISOString()});setForm({offeringId:'',hostUserId:'',title:'',startsAt:'',endsAt:''});setMessage('Live class created. Students can now see it.');await load()}catch(e){setMessage(e.message)}}
   async function recordPresence(action,classId){if(host||!classId)return;fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,classId}),keepalive:true}).catch(()=>{});}
   async function leave(){const active=activeRef.current,call=callRef.current;callRef.current=null;if(call){try{await call.leave()}catch{}call.destroy();}await recordPresence('left',active?.classId);activeRef.current=null;setMeeting(null);setAttendance([]);await load();}
-  async function openRoom(item,breakoutId=null){try{if(callRef.current)await leave();const d=await post({action:host?'join':'join-token',classId:item.id,breakoutId});setMeeting({...d,item});activeRef.current=d;setTimeout(()=>{if(!frameHost.current)return;const call=DailyIframe.createFrame(frameHost.current,{showLeaveButton:true,showFullscreenButton:true,showLocalVideo:true,activeSpeakerMode:false,iframeStyle:{width:'100%',height:'100%',border:'0'}});callRef.current=call;call.on('camera-error',e=>setMessage(e?.errorMsg||'Camera access was blocked or no camera was found. Allow camera access in your browser settings.'));call.on('error',e=>setMessage(e?.errorMsg||'The video room could not load. Leave and try again.'));call.on('load-attempt-failed',()=>setMessage('The video interface could not load. Check your connection and try again.'));call.on('joined-meeting',()=>recordPresence('joined',d.classId));call.on('left-meeting',()=>leave());call.load({url:d.url}).catch(e=>setMessage(e.message||'Unable to load the video room.'));},0);}catch(e){setMessage(e.message)}}
+  async function openRoom(item,breakoutId=null){
+    const meetingWindow=window.open('about:blank','_blank');
+    try{
+      const d=await post({action:host?'join':'join-token',classId:item.id,breakoutId});
+      if(!host)recordPresence('joined',d.classId);
+      if(meetingWindow){meetingWindow.opener=null;meetingWindow.location.replace(d.url)}
+      else window.location.assign(d.url);
+      setMessage('The secure video classroom opened in a new tab. Camera and microphone access will be requested there.');
+    }catch(e){if(meetingWindow)meetingWindow.close();setMessage(e.message)}
+  }
   useEffect(()=>()=>{if(callRef.current)callRef.current.destroy()},[]);
   async function createBreakouts(item){try{await post({action:'breakouts',classId:item.id,count:breakoutCount});setMessage(`${breakoutCount} breakout rooms created and students assigned.`);await load()}catch(e){setMessage(e.message)}}
   async function endClass(item){if(!confirm('End this live class for everyone?'))return;try{await post({action:'end',classId:item.id});if(meeting?.classId===item.id)await leave();await load()}catch(e){setMessage(e.message)}}

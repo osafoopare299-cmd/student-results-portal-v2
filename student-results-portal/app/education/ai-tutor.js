@@ -483,6 +483,7 @@ function PracticeSet({ set, onComplete }) {
 
 export default function AITutor() {
   const [sources, setSources] = useState([]),
+    [enrolledCourses, setEnrolledCourses] = useState([]),
     [course, setCourse] = useState("all"),
     [question, setQuestion] = useState(""),
     [messages, setMessages] = useState([]),
@@ -510,7 +511,10 @@ export default function AITutor() {
     fetch("/api/education/student/ai-tutor", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
-        if (data.ok) setSources(data.sources || []);
+        if (data.ok) {
+          setSources(data.sources || []);
+          setEnrolledCourses(data.courses || []);
+        }
         else setError(data.error || "AI Tutor sources unavailable.");
       })
       .catch(() => setError("AI Tutor sources unavailable."));
@@ -518,15 +522,13 @@ export default function AITutor() {
   }, []);
 
   const courses = useMemo(
-    () => [
-      ...new Map(
-        sources.map((s) => [
-          String(s.offering_id),
-          { id: String(s.offering_id), label: `${s.code} — ${s.course_title}` },
-        ]),
-      ).values(),
-    ],
-    [sources],
+    () =>
+      enrolledCourses.map((item) => ({
+        id: String(item.id),
+        label: `${item.code} — ${item.course_title}`,
+        sourceCount: Number(item.source_count) || 0,
+      })),
+    [enrolledCourses],
   );
   const visibleSources = useMemo(
     () =>
@@ -754,11 +756,29 @@ export default function AITutor() {
               <option value="all">All approved courses</option>
               {courses.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.label}
+                  {c.label}{c.sourceCount ? "" : " — awaiting AI-ready material"}
                 </option>
               ))}
             </select>
           </label>
+          {course !== "all" && !visibleSources.length && (
+            <div
+              style={{
+                marginTop: 10,
+                padding: 12,
+                border: "1px solid #efdcae",
+                borderRadius: 12,
+                background: "#fff8e8",
+                color: "#745a1a",
+                fontSize: 13,
+                lineHeight: 1.45,
+              }}
+            >
+              This course is enrolled, but it does not yet have published,
+              AI-approved material with readable text. Ask the lecturer to
+              publish or finish processing a source.
+            </div>
+          )}
           <div className={`${styles.sourceList} ${mobile.sourceList}`}>
             {visibleSources.map((item) => (
               <article key={item.id}>
@@ -894,7 +914,7 @@ export default function AITutor() {
                 </select>
               )}
               <button
-                disabled={!topic.trim() || loading || !sources.length}
+                disabled={!topic.trim() || loading || !visibleSources.length}
                 onClick={() => generatePractice(practiceType, topic)}
                 style={{ ...buttonStyle, background: "#08744d", color: "#fff" }}
               >
@@ -976,7 +996,7 @@ export default function AITutor() {
                   ))}
                 </div>
                 <button
-                  disabled={loading || !sources.length}
+                  disabled={loading || !visibleSources.length}
                   onClick={practiceWeakest}
                   style={{
                     ...buttonStyle,
@@ -1228,7 +1248,7 @@ export default function AITutor() {
                   {prompts.map((item) => (
                     <button
                       key={item}
-                      disabled={!sources.length || loading}
+                      disabled={!visibleSources.length || loading}
                       onClick={() => ask(item)}
                     >
                       <Search size={15} />
@@ -1317,7 +1337,7 @@ export default function AITutor() {
               rows={2}
             />
             <button
-              disabled={loading || !sources.length}
+              disabled={loading || !visibleSources.length}
               onClick={() => ask()}
               aria-label="Ask AI Tutor"
             >

@@ -6,7 +6,7 @@ import {
   Activity, BarChart3, Bell, BookOpen, Brain, CalendarDays, CheckCircle2,
   ClipboardCheck, FileText, Flame, GraduationCap, LayoutDashboard, ListTodo, Menu,
   MessageSquareText, ShieldCheck, Sparkles, Stethoscope, UserCog, UserRound,
-  Wifi, X
+  Video, Wifi, X
 } from 'lucide-react';
 import styles from './page.module.css';
 
@@ -27,6 +27,7 @@ const workspaces = {
       ['Practice Analytics','Track AI practice scores, trends, strong topics and weak areas',Activity,'/education/student/practice-analytics'],
       ['Notifications','Results, assignments, timetable and learning updates',Bell,'/education/student/notifications'],
       ['Attendance','Class and rotation attendance summaries',CheckCircle2,'/education/student/attendance'],
+      ['Live Classroom','Join video classes, breakout rooms, chat and reactions',Video,'/education/student/live-classroom'],
       ['My Profile','View your academic profile, enrolments and contact details',UserRound,'/education/student/profile'],
     ],
   },
@@ -39,6 +40,7 @@ const workspaces = {
       ['Create Assessment','Build MCQ, written, viva/OSCE and practical assessments',ClipboardCheck,'/education/lecturer/assessments'],
       ['Marks & Results','Mark submissions, finalize scores and release results',BarChart3,'/education/lecturer/assessments'],
       ['Attendance','Create sessions and record attendance',CheckCircle2,'/education/lecturer/attendance'],
+      ['Live Classroom','Host video classes, screen sharing and breakout rooms',Video,'/education/lecturer/live-classroom'],
       ['Announcements','Create class updates and review notification activity',MessageSquareText,'/education/lecturer/notifications'],
       ['Class Analytics','Course performance, pass rates, attendance and marking backlog',Activity,'/education/lecturer/analytics'],
     ],
@@ -57,6 +59,7 @@ const workspaces = {
       ['Result Publication','Review finalized Education marks and release them to students',BarChart3,'/education/admin/results'],
       ['Database Setup','Verify isolation and initialize education tables',ShieldCheck,'/education/admin/setup'],
       ['Platform Analytics','Performance, attendance and activity summaries',BarChart3,'/education/admin/analytics'],
+      ['Live Classroom','Schedule and host video classes across all courses',Video,'/education/admin/live-classroom'],
     ],
   },
 };
@@ -92,6 +95,7 @@ export default function Workspace({ role, user=null, dashboard=null }) {
         {role==='student' && <Link href="/education/student/flashcards"><Brain size={18}/> Flashcards</Link>}
         {role==='student' && <Link href="/education/student/study-rewards"><Flame size={18}/> Study Rewards</Link>}
         {timetableHref ? <Link href={timetableHref}><CalendarDays size={18}/> Timetable</Link> : <a><CalendarDays size={18}/> Timetable</a>}
+        <Link href={`/education/${role}/live-classroom`}><Video size={18}/> Live Classroom</Link>
         {notificationsHref ? <Link href={notificationsHref}><Bell size={18}/> Notifications</Link> : <a><Bell size={18}/> Notifications</a>}
         {role==='student' && <Link href="/education/student/profile"><UserRound size={18}/> My Profile</Link>}
       </nav>
@@ -104,13 +108,16 @@ export default function Workspace({ role, user=null, dashboard=null }) {
         <span className={styles.online}><Wifi size={17}/><span>{dashboard ? 'Connected' : 'Preview'}</span></span>
       </header>
       <div className={styles.inner}>
+        <Link href={`/education/${role}/live-classroom`} style={{display:'inline-flex',alignItems:'center',gap:8,background:'#08744d',color:'#fff',borderRadius:12,padding:'11px 15px',marginBottom:14,fontSize:12,fontWeight:800,boxShadow:'0 8px 22px #08744d22'}}><Video size={18}/> Open Live Classroom</Link>
         <section className={styles.hero}><div><span className={styles.eyebrow}>DROPARE STUDENT EDUCATION SYSTEM</span><h1>{user?.full_name ? `Welcome, ${user.full_name}` : `${data.label} Portal`}</h1><p>{data.welcome}</p></div><div className={styles.heroBadge}><GraduationCap size={28}/><span>Academic Year</span><b>{academicYear}</b></div></section>
         <section className={styles.stats}>{stats.map(([label,value])=><article key={label}><span>{label}</span><strong>{value}</strong></article>)}</section>
         <section className={styles.sectionHead}><div><span className={styles.eyebrow}>WORKSPACE</span><h2>{data.label} tools</h2></div><span className={styles.status}><CheckCircle2 size={16}/> {dashboard ? 'Live data' : 'Route ready'}</span></section>
         <section className={styles.featureGrid}>{data.actions.map(item=><ToolCard key={item[0]} item={item}/>)}</section>
         <section className={styles.foundation}><ShieldCheck size={20}/><div><b>{dashboard ? 'Database-backed workspace' : 'Secure education foundation'}</b><p>{dashboard ? 'Dashboard totals are now loaded from education records. Existing student results publication remains separate and unchanged.' : 'Role access is protected. Live academic data will appear once the education database and authentication environment are activated.'}</p></div></section>
       </div>
-      {role==='student' && <nav className={styles.mobileNav}><Link className={styles.active} href="/education/student"><LayoutDashboard/><span>Home</span></Link><Link href="/education/student/learn"><BookOpen/><span>Learn</span></Link><Link href="/education/student/assess"><ClipboardCheck/><span>Assess</span></Link><Link href="/education/student/results"><BarChart3/><span>Results</span></Link><Link href="/education/student/profile"><UserRound/><span>More</span></Link></nav>}
+      {role==='student' && <nav className={styles.mobileNav}><Link className={styles.active} href="/education/student"><LayoutDashboard/><span>Home</span></Link><Link href="/education/student/learn"><BookOpen/><span>Learn</span></Link><Link href="/education/student/assess"><ClipboardCheck/><span>Assess</span></Link><Link href="/education/student/live-classroom"><Video/><span>Live</span></Link><Link href="/education/student/profile"><UserRound/><span>More</span></Link></nav>}
+      {role==='lecturer' && <nav className={styles.mobileNav}><Link className={styles.active} href="/education/lecturer"><LayoutDashboard/><span>Home</span></Link><Link href="/education/lecturer/learning"><BookOpen/><span>Materials</span></Link><Link href="/education/lecturer/assessments"><ClipboardCheck/><span>Assess</span></Link><Link href="/education/lecturer/live-classroom"><Video/><span>Live</span></Link><Link href="/education/lecturer/notifications"><Bell/><span>Updates</span></Link></nav>}
+      {role==='admin' && <nav className={styles.mobileNav}><Link className={styles.active} href="/education/admin"><LayoutDashboard/><span>Home</span></Link><Link href="/education/admin/people"><UserCog/><span>People</span></Link><Link href="/education/admin/offerings"><BookOpen/><span>Courses</span></Link><Link href="/education/admin/live-classroom"><Video/><span>Live</span></Link><Link href="/education/admin/analytics"><BarChart3/><span>Analytics</span></Link></nav>}
     </section>
   </main>;
 }

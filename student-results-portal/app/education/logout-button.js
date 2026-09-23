@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { LogOut } from 'lucide-react';
 import { educationAuthClient } from '../../lib/education-auth-client';
+import { resetEducationEntryNotification } from '../../lib/education-entry-client';
 
 export default function EducationLogoutButton({ admin = false, menu = false, className }) {
   const [busy, setBusy] = useState(false);
@@ -12,6 +13,7 @@ export default function EducationLogoutButton({ admin = false, menu = false, cla
     setBusy(true);
 
     try {
+      resetEducationEntryNotification();
       if (admin) {
         await fetch('/api/admin/logout', { method: 'POST' });
         window.location.replace('/education/admin-login');

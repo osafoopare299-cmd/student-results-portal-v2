@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Eye, EyeOff, GraduationCap, LockKeyhole, Mail, ShieldCheck, Stethoscope, UserPlus } from 'lucide-react';
 import { educationAuthClient } from '../../../lib/education-auth-client';
+import { notifyEducationEntry } from '../../../lib/education-entry-client';
 import styles from './page.module.css';
 
 export default function EducationLogin(){
@@ -19,6 +20,7 @@ export default function EducationLogin(){
     const payload=await response.json().catch(()=>({}));
     if (!response.ok || !payload?.user?.role) throw new Error(payload?.error || 'Your education role could not be resolved.');
     const destinations={ student:'/education/student', lecturer:'/education/lecturer', admin:'/education/admin' };
+    await notifyEducationEntry();
     window.location.assign(destinations[payload.user.role] || '/education');
   }
 

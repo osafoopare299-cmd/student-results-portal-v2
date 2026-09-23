@@ -14,6 +14,10 @@ import {
   deliverEducationEmail,
   educationOfferingRecipients,
 } from "../../../../../lib/education-email";
+import {
+  ensureEducationAiMaterialSchema,
+  chunkEducationText,
+} from "../../../../../lib/education-ai-materials";
 
 export const dynamic = "force-dynamic";
 const clean = (v, max = 5000) =>
@@ -39,6 +43,7 @@ export async function GET() {
   try {
     const sql = getEducationSql();
     await ensureEducationMaterialFileSchema(sql);
+    await ensureEducationAiMaterialSchema(sql);
     const offerings =
       await sql`select o.id,c.code,c.title,cl.name as class_name,y.name as academic_year,o.term from edu_course_offerings o join edu_courses c on c.id=o.course_id join edu_classes cl on cl.id=o.class_id join edu_academic_years y on y.id=o.academic_year_id where o.lecturer_user_id=${access.user.id} order by y.name desc,c.code`;
     const materials =
@@ -78,6 +83,7 @@ export async function POST(request) {
     const b = await request.json(),
       sql = getEducationSql();
     await ensureEducationMaterialFileSchema(sql);
+    await ensureEducationAiMaterialSchema(sql);
     const offeringId = Number(b.offeringId),
       title = clean(b.title, 240),
       description = clean(b.description, 2000) || null,
@@ -168,8 +174,14 @@ export async function POST(request) {
       );
     }
     const publishedAt = b.publish ? new Date().toISOString() : null;
+    const aiStatus = aiApproved ? "ready" : "not_processed";
     const rows =
-      await sql`insert into edu_learning_materials (offering_id,created_by,title,description,material_type,resource_url,content_text,is_offline_available,is_ai_approved,published_at,blob_pathname,original_filename,file_content_type,file_size_bytes) values (${offeringId},${access.user.id},${title},${description},${materialType},${resourceUrl},${contentText},${Boolean(b.offline)},${aiApproved},${publishedAt},${blobPathname},${originalFilename},${fileContentType},${fileSizeBytes}) returning id,title,published_at,is_ai_approved`;
+      await sql`insert into edu_learning_materials (offering_id,created_by,title,description,material_type,resource_url,content_text,is_offline_available,is_ai_approved,ai_processing_status,ai_processed_at,published_at,blob_pathname,original_filename,file_content_type,file_size_bytes) values (${offeringId},${access.user.id},${title},${description},${materialType},${resourceUrl},${contentText},${Boolean(b.offline)},${aiApproved},${aiStatus},${aiApproved ? new Date().toISOString() : null},${publishedAt},${blobPathname},${originalFilename},${fileContentType},${fileSizeBytes}) returning id,title,published_at,is_ai_approved,ai_processing_status`;
+    if (aiApproved) {
+      const chunks = chunkEducationText(contentText);
+      for (let i = 0; i < chunks.length; i++)
+        await sql`insert into edu_learning_material_chunks(material_id,chunk_index,content) values(${rows[0].id},${i},${chunks[i]})`;
+    }
     uploadedPath = null;
     await sql`insert into edu_audit_logs (actor_user_id,action,entity_type,entity_id,metadata) values (${access.user.id},'learning_material_created','edu_learning_material',${String(rows[0].id)},${JSON.stringify({ published: Boolean(publishedAt), materialType, uploadedFile: Boolean(blobPathname), originalFilename, fileSizeBytes, requestedAiApproval, aiApproved, aiApprovalDeferred })}::jsonb)`;
     let email = null;

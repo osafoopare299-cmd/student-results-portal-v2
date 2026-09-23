@@ -14,6 +14,10 @@ import {
   deliverEducationEmail,
   educationOfferingRecipients,
 } from "../../../../../../lib/education-email";
+import {
+  ensureEducationAiMaterialSchema,
+  chunkEducationText,
+} from "../../../../../../lib/education-ai-materials";
 
 export const dynamic = "force-dynamic";
 const clean = (v, max = 5000) =>
@@ -39,6 +43,7 @@ export async function PATCH(request, { params }) {
       b = await request.json(),
       sql = getEducationSql();
     await ensureEducationMaterialFileSchema(sql);
+    await ensureEducationAiMaterialSchema(sql);
     const material = await ownedMaterial(sql, id, access.user.id);
     if (!material)
       return NextResponse.json(
@@ -139,8 +144,23 @@ export async function PATCH(request, { params }) {
     if (b.publish === true && !publishedAt)
       publishedAt = new Date().toISOString();
     if (b.publish === false) publishedAt = null;
+    const manuallyIndexed =
+      aiApproved &&
+      Boolean(contentText) &&
+      (materialType === "note" ||
+        !blobPathname ||
+        contentText !== material.content_text);
+    const aiStatus = aiApproved ? (manuallyIndexed ? "ready" : material.ai_processing_status) : "not_processed";
     const rows =
-      await sql`update edu_learning_materials set title=${title},description=${description},material_type=${materialType},resource_url=${resourceUrl},content_text=${contentText},is_offline_available=${offline},is_ai_approved=${aiApproved},published_at=${publishedAt},blob_pathname=${blobPathname},original_filename=${originalFilename},file_content_type=${fileContentType},file_size_bytes=${fileSizeBytes},updated_at=now() where id=${id} returning id,title,published_at,is_offline_available,is_ai_approved`;
+      await sql`update edu_learning_materials set title=${title},description=${description},material_type=${materialType},resource_url=${resourceUrl},content_text=${contentText},is_offline_available=${offline},is_ai_approved=${aiApproved},ai_processing_status=${aiStatus},ai_processed_at=${manuallyIndexed ? new Date().toISOString() : material.ai_processed_at},ai_processing_error=${manuallyIndexed || !aiApproved ? null : material.ai_processing_error},published_at=${publishedAt},blob_pathname=${blobPathname},original_filename=${originalFilename},file_content_type=${fileContentType},file_size_bytes=${fileSizeBytes},updated_at=now() where id=${id} returning id,title,published_at,is_offline_available,is_ai_approved,ai_processing_status`;
+    if (manuallyIndexed || !aiApproved) {
+      await sql`delete from edu_learning_material_chunks where material_id=${id}`;
+      if (manuallyIndexed) {
+        const chunks = chunkEducationText(contentText);
+        for (let i = 0; i < chunks.length; i++)
+          await sql`insert into edu_learning_material_chunks(material_id,chunk_index,content) values(${id},${i},${chunks[i]})`;
+      }
+    }
     if (
       material.blob_pathname &&
       material.blob_pathname !== blobPathname &&
@@ -194,6 +214,7 @@ export async function DELETE(request, { params }) {
     const { id } = await params,
       sql = getEducationSql();
     await ensureEducationMaterialFileSchema(sql);
+    await ensureEducationAiMaterialSchema(sql);
     const material = await ownedMaterial(sql, id, access.user.id);
     if (!material)
       return NextResponse.json(

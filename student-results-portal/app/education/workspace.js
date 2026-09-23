@@ -108,7 +108,7 @@ export default function Workspace({ role, user=null, dashboard=null }) {
         <span className={styles.online}><Wifi size={17}/><span>{dashboard ? 'Connected' : 'Preview'}</span></span>
       </header>
       <div className={styles.inner}>
-        {role==='lecturer'&&<Link href="/education/lecturer/live-classroom" style={{display:'inline-flex',alignItems:'center',gap:8,background:'#08744d',color:'#fff',borderRadius:12,padding:'11px 15px',marginBottom:14,fontSize:12,fontWeight:800,boxShadow:'0 8px 22px #08744d22'}}><Video size={18}/> Open Live Classroom</Link>}
+        <Link href={`/education/${role}/live-classroom`} style={{display:'inline-flex',alignItems:'center',gap:8,background:'#08744d',color:'#fff',borderRadius:12,padding:'11px 15px',marginBottom:14,fontSize:12,fontWeight:800,boxShadow:'0 8px 22px #08744d22'}}><Video size={18}/> Open Live Classroom</Link>
         <section className={styles.hero}><div><span className={styles.eyebrow}>DROPARE STUDENT EDUCATION SYSTEM</span><h1>{user?.full_name ? `Welcome, ${user.full_name}` : `${data.label} Portal`}</h1><p>{data.welcome}</p></div><div className={styles.heroBadge}><GraduationCap size={28}/><span>Academic Year</span><b>{academicYear}</b></div></section>
         <section className={styles.stats}>{stats.map(([label,value])=><article key={label}><span>{label}</span><strong>{value}</strong></article>)}</section>
         <section className={styles.sectionHead}><div><span className={styles.eyebrow}>WORKSPACE</span><h2>{data.label} tools</h2></div><span className={styles.status}><CheckCircle2 size={16}/> {dashboard ? 'Live data' : 'Route ready'}</span></section>
@@ -117,6 +117,7 @@ export default function Workspace({ role, user=null, dashboard=null }) {
       </div>
       {role==='student' && <nav className={styles.mobileNav}><Link className={styles.active} href="/education/student"><LayoutDashboard/><span>Home</span></Link><Link href="/education/student/learn"><BookOpen/><span>Learn</span></Link><Link href="/education/student/assess"><ClipboardCheck/><span>Assess</span></Link><Link href="/education/student/live-classroom"><Video/><span>Live</span></Link><Link href="/education/student/profile"><UserRound/><span>More</span></Link></nav>}
       {role==='lecturer' && <nav className={styles.mobileNav}><Link className={styles.active} href="/education/lecturer"><LayoutDashboard/><span>Home</span></Link><Link href="/education/lecturer/learning"><BookOpen/><span>Materials</span></Link><Link href="/education/lecturer/assessments"><ClipboardCheck/><span>Assess</span></Link><Link href="/education/lecturer/live-classroom"><Video/><span>Live</span></Link><Link href="/education/lecturer/notifications"><Bell/><span>Updates</span></Link></nav>}
+      {role==='admin' && <nav className={styles.mobileNav}><Link className={styles.active} href="/education/admin"><LayoutDashboard/><span>Home</span></Link><Link href="/education/admin/people"><UserCog/><span>People</span></Link><Link href="/education/admin/offerings"><BookOpen/><span>Courses</span></Link><Link href="/education/admin/live-classroom"><Video/><span>Live</span></Link><Link href="/education/admin/analytics"><BarChart3/><span>Analytics</span></Link></nav>}
     </section>
   </main>;
 }

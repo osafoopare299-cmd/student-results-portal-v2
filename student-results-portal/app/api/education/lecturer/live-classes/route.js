@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getEducationUser } from '../../../../../lib/education-session';
 import { getEducationSql } from '../../../../../lib/db';
-import { createDailyRoom, createDailyToken, dailyConfigured, dailyRoomUrl } from '../../../../../lib/daily-video';
+import { jitsiConfigured, jitsiRoomUrl } from '../../../../../lib/jitsi-video';
 import { cleanText, ensureLiveClassroomSchema, roomName } from '../../../../../lib/education-live-classroom';
 
 export const dynamic = 'force-dynamic';
@@ -34,7 +34,7 @@ export async function handleGetLiveClasses(role='lecturer', authenticatedAccess=
   if (!access.ok) return NextResponse.json({ok:false,error:`${role==='admin'?'Administrator':'Lecturer'} access required.`},{status:401});
   try {
     const sql=getEducationSql(); await ensureLiveClassroomSchema(sql);
-    return NextResponse.json({ok:true,configured:dailyConfigured(),...(await loadData(sql,access.user.id,role))});
+    return NextResponse.json({ok:true,configured:jitsiConfigured(),provider:'jitsi',...(await loadData(sql,access.user.id,role))});
   } catch (error) { console.error('Live classroom load failed:',error); return NextResponse.json({ok:false,error:error.message||'Unable to load live classes.'},{status:503}); }
 }
 
@@ -58,9 +58,9 @@ export async function handlePostLiveClasses(request,role='lecturer',authenticate
         if(!host)return NextResponse.json({ok:false,error:'Selected host is not available.'},{status:400});
         hostUserId=host.id;
       }
-      const name=roomName(offering.code,offeringId),daily=await createDailyRoom({name,startsAt,endsAt});
+      const name=roomName(offering.code,offeringId);
       const createdBy=role==='admin'?hostUserId:access.user.id;
-      const rows=await sql`insert into edu_live_classes (offering_id,title,starts_at,ends_at,daily_room_name,created_by,host_user_id) values (${offeringId},${title},${startsAt.toISOString()},${endsAt.toISOString()},${daily.name},${createdBy},${hostUserId}) returning *`;
+      const rows=await sql`insert into edu_live_classes (offering_id,title,starts_at,ends_at,daily_room_name,created_by,host_user_id) values (${offeringId},${title},${startsAt.toISOString()},${endsAt.toISOString()},${name},${createdBy},${hostUserId}) returning *`;
       return NextResponse.json({ok:true,liveClass:rows[0]});
     }
     if(body.action==='join'){
@@ -69,8 +69,7 @@ export async function handlePostLiveClasses(request,role='lecturer',authenticate
       let target={daily_room_name:liveClass.daily_room_name,name:'Main classroom'};
       if(body.breakoutId){target=(await sql`select id,name,daily_room_name from edu_live_breakout_rooms where id=${Number(body.breakoutId)} and live_class_id=${liveClass.id} limit 1`)[0]||target;}
       await sql`update edu_live_classes set status='live',updated_at=now() where id=${liveClass.id} and status='scheduled'`;
-      const token=await createDailyToken({roomName:target.daily_room_name,user:access.user,owner:true,expiresAt:liveClass.ends_at});
-      return NextResponse.json({ok:true,url:`${dailyRoomUrl(target.daily_room_name)}?t=${token}`,roomName:target.name,classId:liveClass.id});
+      return NextResponse.json({ok:true,url:jitsiRoomUrl(target.daily_room_name),roomName:target.name,classId:liveClass.id,provider:'jitsi'});
     }
     if(body.action==='end'){
       const liveClass=await ownedClass(sql,Number(body.classId),access.user.id,role);
@@ -86,8 +85,8 @@ export async function handlePostLiveClasses(request,role='lecturer',authenticate
       await sql`delete from edu_live_breakout_rooms where live_class_id=${liveClass.id}`;
       const rooms=[];
       for(let i=0;i<count;i++){
-        const name=roomName(`breakout-${liveClass.id}-${i+1}`,i+1),daily=await createDailyRoom({name,startsAt:new Date(),endsAt:liveClass.ends_at});
-        const saved=(await sql`insert into edu_live_breakout_rooms (live_class_id,name,daily_room_name) values (${liveClass.id},${`Breakout ${i+1}`},${daily.name}) returning *`)[0];rooms.push(saved);
+        const name=roomName(`breakout-${liveClass.id}-${i+1}`,i+1);
+        const saved=(await sql`insert into edu_live_breakout_rooms (live_class_id,name,daily_room_name) values (${liveClass.id},${`Breakout ${i+1}`},${name}) returning *`)[0];rooms.push(saved);
       }
       for(let i=0;i<students.length;i++)await sql`insert into edu_live_breakout_assignments (breakout_room_id,student_user_id) values (${rooms[i%rooms.length].id},${students[i].student_user_id}) on conflict do nothing`;
       return NextResponse.json({ok:true,rooms});

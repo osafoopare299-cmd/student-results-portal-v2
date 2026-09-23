@@ -44,7 +44,8 @@ export async function ensureLiveClassroomSchema(sql) {
 export const cleanText = (value, max = 200) => String(value ?? '').trim().slice(0, max);
 
 export function roomName(prefix, id) {
-  return `dropare-${prefix}-${id}-${Date.now().toString(36)}`.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 64);
+  const random=crypto.randomUUID().replace(/-/g,'');
+  return `dropare-${prefix}-${id}-${random}`.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 64);
 }
 
 export async function closeAttendance(sql, liveClassId, userId) {

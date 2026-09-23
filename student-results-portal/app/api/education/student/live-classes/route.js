@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getEducationUser } from '../../../../../lib/education-session';
 import { getEducationSql } from '../../../../../lib/db';
-import { createDailyToken, dailyRoomUrl } from '../../../../../lib/daily-video';
+import { jitsiRoomUrl } from '../../../../../lib/jitsi-video';
 import { closeAttendance, ensureLiveClassroomSchema } from '../../../../../lib/education-live-classroom';
 
 export const dynamic='force-dynamic';
@@ -22,8 +22,7 @@ export async function POST(request){
     if(body.action==='join-token'){
       let target={daily_room_name:liveClass.daily_room_name,name:'Main classroom'};
       if(body.breakoutId){const assigned=(await sql`select b.id,b.name,b.daily_room_name from edu_live_breakout_rooms b join edu_live_breakout_assignments a on a.breakout_room_id=b.id where b.id=${Number(body.breakoutId)} and b.live_class_id=${liveClass.id} and a.student_user_id=${access.user.id} limit 1`)[0];if(assigned)target=assigned;}
-      const token=await createDailyToken({roomName:target.daily_room_name,user:access.user,expiresAt:liveClass.ends_at});
-      return NextResponse.json({ok:true,url:`${dailyRoomUrl(target.daily_room_name)}?t=${token}`,roomName:target.name,classId:liveClass.id});
+      return NextResponse.json({ok:true,url:jitsiRoomUrl(target.daily_room_name),roomName:target.name,classId:liveClass.id,provider:'jitsi'});
     }
     if(body.action==='joined'){
       await sql`insert into edu_live_attendance (live_class_id,user_id,first_joined_at,current_joined_at,join_count) values (${liveClass.id},${access.user.id},now(),now(),1) on conflict (live_class_id,user_id) do update set current_joined_at=coalesce(edu_live_attendance.current_joined_at,now()),join_count=edu_live_attendance.join_count+case when edu_live_attendance.current_joined_at is null then 1 else 0 end,updated_at=now()`;

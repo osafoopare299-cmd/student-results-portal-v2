@@ -1,24 +1,22 @@
 'use client';
 
-import DailyIframe from '@daily-co/daily-js';
 import Link from 'next/link';
-import { useCallback,useEffect,useRef,useState } from 'react';
-import { ArrowLeft,Clock3,DoorOpen,Hand,LoaderCircle,LogIn,MessageCircle,MonitorUp,Plus,Smile,Users,Video,X } from 'lucide-react';
+import { useCallback,useEffect,useState } from 'react';
+import { ArrowLeft,Clock3,DoorOpen,LoaderCircle,LogIn,Plus,Users,Video } from 'lucide-react';
 import styles from './live-classroom.module.css';
 
 const fmt=v=>`${new Date(v).toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short',timeZone:'UTC'})} GMT`;
 const duration=s=>{const m=Math.round(Number(s||0)/60);return m<60?`${m} min`:`${Math.floor(m/60)}h ${m%60}m`;};
 
 export default function LiveClassroom({role}){
-  const lecturer=role==='lecturer',host=role!=='student',admin=role==='admin',endpoint=`/api/education/${role}/live-classes`,frameHost=useRef(null),callRef=useRef(null),activeRef=useRef(null);
-  const [data,setData]=useState({classes:[],offerings:[]}),[loading,setLoading]=useState(true),[message,setMessage]=useState(''),[meeting,setMeeting]=useState(null),[attendance,setAttendance]=useState([]),[breakoutCount,setBreakoutCount]=useState(2);
+  const lecturer=role==='lecturer',host=role!=='student',admin=role==='admin',endpoint=`/api/education/${role}/live-classes`;
+  const [data,setData]=useState({classes:[],offerings:[]}),[loading,setLoading]=useState(true),[message,setMessage]=useState(''),[attendance,setAttendance]=useState([]),[breakoutCount,setBreakoutCount]=useState(2);
   const [form,setForm]=useState({offeringId:'',hostUserId:'',title:'',startsAt:'',endsAt:''});
   const load=useCallback(async()=>{try{const r=await fetch(endpoint,{cache:'no-store'}),d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to load live classes.');setData(d);}catch(e){setMessage(e.message)}finally{setLoading(false)}},[endpoint]);
   useEffect(()=>{load();const timer=setInterval(load,20000);return()=>clearInterval(timer)},[load]);
   async function post(body){setMessage('');const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),d=await r.json();if(!r.ok)throw new Error(d.error||'Unable to complete that action.');return d;}
   async function create(e){e.preventDefault();try{await post({action:'create',...form,startsAt:new Date(`${form.startsAt}Z`).toISOString(),endsAt:new Date(`${form.endsAt}Z`).toISOString()});setForm({offeringId:'',hostUserId:'',title:'',startsAt:'',endsAt:''});setMessage('Live class created. Students can now see it.');await load()}catch(e){setMessage(e.message)}}
   async function recordPresence(action,classId){if(host||!classId)return;fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,classId}),keepalive:true}).catch(()=>{});}
-  async function leave(){const active=activeRef.current,call=callRef.current;callRef.current=null;if(call){try{await call.leave()}catch{}call.destroy();}await recordPresence('left',active?.classId);activeRef.current=null;setMeeting(null);setAttendance([]);await load();}
   async function openRoom(item,breakoutId=null){
     const meetingWindow=window.open('about:blank','_blank');
     try{
@@ -26,20 +24,20 @@ export default function LiveClassroom({role}){
       if(!host)recordPresence('joined',d.classId);
       if(meetingWindow){meetingWindow.opener=null;meetingWindow.location.replace(d.url)}
       else window.location.assign(d.url);
-      setMessage('The secure video classroom opened in a new tab. Camera and microphone access will be requested there.');
+      if(!host&&meetingWindow){const closeWatch=setInterval(()=>{if(meetingWindow.closed){clearInterval(closeWatch);recordPresence('left',d.classId);load()}},2000)}
+      setMessage('The Jitsi classroom opened in a new tab. Allow camera and microphone access there.');
     }catch(e){if(meetingWindow)meetingWindow.close();setMessage(e.message)}
   }
-  useEffect(()=>()=>{if(callRef.current)callRef.current.destroy()},[]);
   async function createBreakouts(item){try{await post({action:'breakouts',classId:item.id,count:breakoutCount});setMessage(`${breakoutCount} breakout rooms created and students assigned.`);await load()}catch(e){setMessage(e.message)}}
-  async function endClass(item){if(!confirm('End this live class for everyone?'))return;try{await post({action:'end',classId:item.id});if(meeting?.classId===item.id)await leave();await load()}catch(e){setMessage(e.message)}}
+  async function endClass(item){if(!confirm('End this live class for everyone?'))return;try{await post({action:'end',classId:item.id});await load()}catch(e){setMessage(e.message)}}
   async function viewAttendance(item){try{const d=await post({action:'attendance',classId:item.id});setAttendance(d.attendance||[])}catch(e){setMessage(e.message)}}
   const available=data.classes||[];
   return <main className={styles.page}><div className={styles.wrap}>
-    <header className={styles.header}><div><Link className={styles.back} href={`/education/${role}`}><ArrowLeft size={17}/> Back to dashboard</Link><span className={styles.eyebrow}>{admin?'ADMINISTRATOR WORKSPACE':lecturer?'LECTURER WORKSPACE':'STUDENT WORKSPACE'}</span><h1>Live Classroom</h1><p>{host?'Schedule and host secure course-linked video classes.':'Join live sessions for your enrolled courses.'}</p></div><span className={styles.status}><Video size={15}/> Daily connected · recording off</span></header>
+    <header className={styles.header}><div><Link className={styles.back} href={`/education/${role}`}><ArrowLeft size={17}/> Back to dashboard</Link><span className={styles.eyebrow}>{admin?'ADMINISTRATOR WORKSPACE':lecturer?'LECTURER WORKSPACE':'STUDENT WORKSPACE'}</span><h1>Live Classroom</h1><p>{host?'Schedule and host secure course-linked video classes.':'Join live sessions for your enrolled courses.'}</p></div><span className={styles.status}><Video size={15}/> Jitsi Meet connected · recording off</span></header>
     {message&&<p className={styles.notice}>{message}</p>}
     {host&&<section className={styles.card}>{lecturer&&data.offerings?.length===0?<div className={styles.empty}><b>No courses are assigned to your lecturer account.</b><p>Ask an administrator to assign you to a course offering before scheduling a live class.</p></div>:<form className={styles.create} onSubmit={create}><select required value={form.offeringId} onChange={e=>setForm({...form,offeringId:e.target.value})}><option value="">Select course</option>{(data.offerings||[]).map(o=><option key={o.id} value={o.id}>{o.code} · {o.class_name}{admin&&o.lecturer_name?` · ${o.lecturer_name}`:''}</option>)}</select>{admin&&<select required value={form.hostUserId} onChange={e=>setForm({...form,hostUserId:e.target.value})}><option value="">Select host</option>{(data.hosts||[]).map(h=><option key={h.id} value={h.id}>{h.full_name} · {h.role}</option>)}</select>}<input required placeholder="Class topic" value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/><label className={styles.timeField}><span>Starts (GMT)</span><input required type="datetime-local" value={form.startsAt} onChange={e=>setForm({...form,startsAt:e.target.value})}/></label><label className={styles.timeField}><span>Ends (GMT)</span><input required type="datetime-local" value={form.endsAt} onChange={e=>setForm({...form,endsAt:e.target.value})}/></label><button className={styles.button}><Plus size={17}/> Create class</button></form>}</section>}
     {!host&&<section className={styles.studentHero}><span className={styles.eyebrow}>COURSE VIDEO SESSIONS</span><h1>Your classes</h1><p>Camera, microphone, screen sharing, chat, hand raising, breakout rooms and emoji reactions are available inside each session.</p></section>}
     {loading?<div className={styles.empty}><LoaderCircle/> Loading live classes…</div>:<section className={styles.list}>{available.length?available.map(item=><article className={styles.classCard} key={item.id}><div><span className={styles.eyebrow}>{item.code} · {String(item.status).toUpperCase()}</span><h2>{item.title}</h2><p>{item.course_title} · {item.class_name}{item.host_name?` · Host: ${item.host_name}`:''}</p><div className={styles.meta}><span><Clock3 size={14}/> {fmt(item.starts_at)} – {fmt(item.ends_at)}</span>{host&&<span><Users size={14}/> {item.attendees||0} attended</span>}</div>{item.breakout_name&&<small>Assigned: {item.breakout_name}</small>}</div><div className={styles.actions}>{item.status!=='ended'&&<button className={styles.button} onClick={()=>openRoom(item)}><LogIn size={16}/> {host?'Start / join':'Join class'}</button>}{!host&&item.breakout_id&&item.status!=='ended'&&<button className={`${styles.button} ${styles.ghost}`} onClick={()=>openRoom(item,item.breakout_id)}><DoorOpen size={16}/> Join {item.breakout_name}</button>}{host&&item.status!=='ended'&&<><span className={styles.breakout}><select value={breakoutCount} onChange={e=>setBreakoutCount(Number(e.target.value))}>{[2,3,4,5,6,7,8].map(n=><option key={n}>{n}</option>)}</select><button className={`${styles.button} ${styles.ghost}`} onClick={()=>createBreakouts(item)}><DoorOpen size={16}/> Breakouts</button></span><button className={`${styles.button} ${styles.ghost}`} onClick={()=>viewAttendance(item)}><Users size={16}/> Attendance</button><button className={`${styles.button} ${styles.danger}`} onClick={()=>endClass(item)}>End</button></>}</div>{host&&item.breakouts?.length>0&&<div className={styles.meta} style={{gridColumn:'1/-1'}}>{item.breakouts.map(b=><button key={b.id} className={`${styles.button} ${styles.ghost}`} onClick={()=>openRoom(item,b.id)}>{b.name} · {b.assigned}</button>)}</div>}</article>):<div className={`${styles.card} ${styles.empty}`}>No live classes are scheduled.</div>}</section>}
     {host&&attendance.length>0&&<section className={`${styles.card} ${styles.attendance}`}><h2>Live attendance</h2>{attendance.map(a=><div className={styles.attendanceRow} key={a.email}><span><b>{a.full_name}</b><br/><small>{a.email}</small></span><span className={a.online?styles.online:styles.offline}>{a.online?'Online':'Left'}</span><span>{duration(a.total_seconds)} · {a.join_count} join{Number(a.join_count)===1?'':'s'}</span></div>)}</section>}
-  </div>{meeting&&<section className={styles.meeting}><header className={styles.meetingTop}><strong>{meeting.item.title} · {meeting.roomName}</strong><div><span title="Screen sharing"><MonitorUp size={17}/></span><span title="Chat"><MessageCircle size={17}/></span><span title="Raise hand"><Hand size={17}/></span><span title="Emoji reactions"><Smile size={17}/></span><button className={`${styles.button} ${styles.danger}`} onClick={leave}><X size={17}/> Leave</button></div></header><div className={styles.frameWrap}><div ref={frameHost} className={styles.frame}/></div></section>}</main>;
+  </div></main>;
 }

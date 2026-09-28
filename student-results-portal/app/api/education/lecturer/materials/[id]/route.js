@@ -14,6 +14,10 @@ import {
   deliverEducationEmail,
   educationOfferingRecipients,
 } from "../../../../../../lib/education-email";
+import {
+  ensureEducationAiMaterialSchema,
+  chunkEducationText,
+} from "../../../../../../lib/education-ai-materials";
 
 export const dynamic = "force-dynamic";
 const clean = (v, max = 5000) =>
@@ -39,6 +43,7 @@ export async function PATCH(request, { params }) {
       b = await request.json(),
       sql = getEducationSql();
     await ensureEducationMaterialFileSchema(sql);
+    await ensureEducationAiMaterialSchema(sql);
     const material = await ownedMaterial(sql, id, access.user.id);
     if (!material)
       return NextResponse.json(
@@ -122,10 +127,19 @@ export async function PATCH(request, { params }) {
       b.offline === undefined
         ? material.is_offline_available
         : Boolean(b.offline);
-    const aiApproved =
+    const requestedAiApproved =
       b.aiApproved === undefined
         ? material.is_ai_approved
         : Boolean(b.aiApproved);
+    const sourceChanged =
+      materialType !== material.material_type ||
+      resourceUrl !== material.resource_url ||
+      blobPathname !== material.blob_pathname ||
+      fileContentType !== material.file_content_type ||
+      Number(fileSizeBytes || 0) !== Number(material.file_size_bytes || 0);
+    const manualContentChanged = contentText !== material.content_text;
+    const aiApproved =
+      requestedAiApproved && !(sourceChanged && !manualContentChanged);
     if (aiApproved && !contentText)
       return NextResponse.json(
         {
@@ -135,12 +149,34 @@ export async function PATCH(request, { params }) {
         },
         { status: 400 },
       );
+    const aiChunks = aiApproved ? chunkEducationText(contentText) : [];
+    let aiStatus = material.ai_processing_status || "not_processed";
+    let aiProcessedAt = material.ai_processed_at || null;
+    let aiProcessingError = material.ai_processing_error || null;
+    if (aiApproved) {
+      aiStatus = "ready";
+      aiProcessedAt = new Date().toISOString();
+      aiProcessingError = null;
+    } else if (
+      sourceChanged ||
+      manualContentChanged ||
+      b.aiApproved !== undefined
+    ) {
+      aiStatus = "not_processed";
+      aiProcessedAt = null;
+      aiProcessingError = null;
+    }
     let publishedAt = material.published_at;
     if (b.publish === true && !publishedAt)
       publishedAt = new Date().toISOString();
     if (b.publish === false) publishedAt = null;
     const rows =
-      await sql`update edu_learning_materials set title=${title},description=${description},material_type=${materialType},resource_url=${resourceUrl},content_text=${contentText},is_offline_available=${offline},is_ai_approved=${aiApproved},published_at=${publishedAt},blob_pathname=${blobPathname},original_filename=${originalFilename},file_content_type=${fileContentType},file_size_bytes=${fileSizeBytes},updated_at=now() where id=${id} returning id,title,published_at,is_offline_available,is_ai_approved`;
+      await sql`update edu_learning_materials set title=${title},description=${description},material_type=${materialType},resource_url=${resourceUrl},content_text=${contentText},is_offline_available=${offline},is_ai_approved=${aiApproved},ai_processing_status=${aiStatus},ai_processed_at=${aiProcessedAt},ai_processing_error=${aiProcessingError},published_at=${publishedAt},blob_pathname=${blobPathname},original_filename=${originalFilename},file_content_type=${fileContentType},file_size_bytes=${fileSizeBytes},updated_at=now() where id=${id} returning id,title,published_at,is_offline_available,is_ai_approved,ai_processing_status`;
+    if (aiApproved || sourceChanged || manualContentChanged || b.aiApproved === false) {
+      await sql`delete from edu_learning_material_chunks where material_id=${id}`;
+      for (let index = 0; index < aiChunks.length; index++)
+        await sql`insert into edu_learning_material_chunks(material_id,chunk_index,content) values(${id},${index},${aiChunks[index]})`;
+    }
     if (
       material.blob_pathname &&
       material.blob_pathname !== blobPathname &&

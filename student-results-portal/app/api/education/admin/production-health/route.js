@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { isAdmin } from '../../../../../lib/admin-auth';
 import { getEducationSql } from '../../../../../lib/db';
 import { educationBlobConfigured } from '../../../../../lib/education-material-files';
-import { getEducationGatewayToken } from '../../../../../lib/education-ai-gateway';
 
 export const dynamic='force-dynamic';
 
@@ -22,14 +21,12 @@ export async function GET(){
     const missingTables=CORE_TABLES.filter(name=>!present.has(name));
     const dbPing=await sql`select now() as database_time`;
     const blobConfigured=educationBlobConfigured();
-    const aiConfigured=Boolean(await getEducationGatewayToken());
     const educationDatabaseConfigured=Boolean(process.env.EDUCATION_DATABASE_URL);
     const checks={
       educationDatabaseConfigured,
       databaseReachable:Boolean(dbPing?.[0]?.database_time),
       coreSchemaReady:missingTables.length===0,
       blobConfigured,
-      aiTutorConfigured:aiConfigured,
       pwaAssetsExpected:true
     };
     const criticalReady=checks.educationDatabaseConfigured&&checks.databaseReachable&&checks.coreSchemaReady;
@@ -41,7 +38,6 @@ export async function GET(){
       missingTables,
       notes:[
         blobConfigured?'Private learning-file storage is configured.':'Vercel Blob is not confirmed in this environment; URL-based materials still work.',
-        aiConfigured?'AI Tutor credentials are available.':'AI Tutor credentials are not available in this environment.',
         'PWA manifest/service-worker files are deployed with the application; install/offline behavior should still be smoke-tested on a real device.'
       ]
     });

@@ -42,7 +42,7 @@ export async function GET() {
     const offerings =
       await sql`select o.id,c.code,c.title,cl.name as class_name,y.name as academic_year,o.term from edu_course_offerings o join edu_courses c on c.id=o.course_id join edu_classes cl on cl.id=o.class_id join edu_academic_years y on y.id=o.academic_year_id where o.lecturer_user_id=${access.user.id} order by y.name desc,c.code`;
     const materials =
-      await sql`select m.id,m.offering_id,m.title,m.description,m.material_type,m.resource_url,m.content_text,m.is_offline_available,m.is_ai_approved,m.ai_processing_status,m.ai_processing_error,m.ai_processed_at,m.published_at,m.created_at,m.blob_pathname,m.original_filename,m.file_content_type,m.file_size_bytes,c.code,c.title as course_title,cl.name as class_name from edu_learning_materials m join edu_course_offerings o on o.id=m.offering_id join edu_courses c on c.id=o.course_id join edu_classes cl on cl.id=o.class_id where m.created_by=${access.user.id} order by m.created_at desc limit 200`;
+      await sql`select m.id,m.offering_id,m.title,m.description,m.material_type,m.resource_url,m.content_text,m.is_offline_available,m.published_at,m.created_at,m.blob_pathname,m.original_filename,m.file_content_type,m.file_size_bytes,c.code,c.title as course_title,cl.name as class_name from edu_learning_materials m join edu_course_offerings o on o.id=m.offering_id join edu_courses c on c.id=o.course_id join edu_classes cl on cl.id=o.class_id where m.created_by=${access.user.id} order by m.created_at desc limit 200`;
     return NextResponse.json({
       ok: true,
       offerings,
@@ -155,9 +155,6 @@ export async function POST(request) {
         { status: 400 },
       );
     }
-    const requestedAiApproval = Boolean(b.aiApproved),
-      aiApproved = requestedAiApproval && Boolean(contentText),
-      aiApprovalDeferred = requestedAiApproval && !aiApproved;
     const own =
       await sql`select id from edu_course_offerings where id=${offeringId} and lecturer_user_id=${access.user.id} limit 1`;
     if (!own.length) {
@@ -169,9 +166,9 @@ export async function POST(request) {
     }
     const publishedAt = b.publish ? new Date().toISOString() : null;
     const rows =
-      await sql`insert into edu_learning_materials (offering_id,created_by,title,description,material_type,resource_url,content_text,is_offline_available,is_ai_approved,published_at,blob_pathname,original_filename,file_content_type,file_size_bytes) values (${offeringId},${access.user.id},${title},${description},${materialType},${resourceUrl},${contentText},${Boolean(b.offline)},${aiApproved},${publishedAt},${blobPathname},${originalFilename},${fileContentType},${fileSizeBytes}) returning id,title,published_at,is_ai_approved`;
+      await sql`insert into edu_learning_materials (offering_id,created_by,title,description,material_type,resource_url,content_text,is_offline_available,published_at,blob_pathname,original_filename,file_content_type,file_size_bytes) values (${offeringId},${access.user.id},${title},${description},${materialType},${resourceUrl},${contentText},${Boolean(b.offline)},${publishedAt},${blobPathname},${originalFilename},${fileContentType},${fileSizeBytes}) returning id,title,published_at`;
     uploadedPath = null;
-    await sql`insert into edu_audit_logs (actor_user_id,action,entity_type,entity_id,metadata) values (${access.user.id},'learning_material_created','edu_learning_material',${String(rows[0].id)},${JSON.stringify({ published: Boolean(publishedAt), materialType, uploadedFile: Boolean(blobPathname), originalFilename, fileSizeBytes, requestedAiApproval, aiApproved, aiApprovalDeferred })}::jsonb)`;
+    await sql`insert into edu_audit_logs (actor_user_id,action,entity_type,entity_id,metadata) values (${access.user.id},'learning_material_created','edu_learning_material',${String(rows[0].id)},${JSON.stringify({ published: Boolean(publishedAt), materialType, uploadedFile: Boolean(blobPathname), originalFilename, fileSizeBytes })}::jsonb)`;
     let email = null;
     if (publishedAt) {
       const course = (
@@ -192,7 +189,6 @@ export async function POST(request) {
     return NextResponse.json({
       ok: true,
       material: rows[0],
-      aiApprovalDeferred,
       email,
     });
   } catch (error) {

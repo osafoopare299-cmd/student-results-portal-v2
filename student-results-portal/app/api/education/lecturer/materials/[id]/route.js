@@ -122,25 +122,12 @@ export async function PATCH(request, { params }) {
       b.offline === undefined
         ? material.is_offline_available
         : Boolean(b.offline);
-    const aiApproved =
-      b.aiApproved === undefined
-        ? material.is_ai_approved
-        : Boolean(b.aiApproved);
-    if (aiApproved && !contentText)
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "Add approved text/content before enabling this material as an AI Tutor source.",
-        },
-        { status: 400 },
-      );
     let publishedAt = material.published_at;
     if (b.publish === true && !publishedAt)
       publishedAt = new Date().toISOString();
     if (b.publish === false) publishedAt = null;
     const rows =
-      await sql`update edu_learning_materials set title=${title},description=${description},material_type=${materialType},resource_url=${resourceUrl},content_text=${contentText},is_offline_available=${offline},is_ai_approved=${aiApproved},published_at=${publishedAt},blob_pathname=${blobPathname},original_filename=${originalFilename},file_content_type=${fileContentType},file_size_bytes=${fileSizeBytes},updated_at=now() where id=${id} returning id,title,published_at,is_offline_available,is_ai_approved`;
+      await sql`update edu_learning_materials set title=${title},description=${description},material_type=${materialType},resource_url=${resourceUrl},content_text=${contentText},is_offline_available=${offline},published_at=${publishedAt},blob_pathname=${blobPathname},original_filename=${originalFilename},file_content_type=${fileContentType},file_size_bytes=${fileSizeBytes},updated_at=now() where id=${id} returning id,title,published_at,is_offline_available`;
     if (
       material.blob_pathname &&
       material.blob_pathname !== blobPathname &&
@@ -152,7 +139,7 @@ export async function PATCH(request, { params }) {
         console.error("Old learning file cleanup failed:", error);
       }
     }
-    await sql`insert into edu_audit_logs (actor_user_id,action,entity_type,entity_id,metadata) values (${access.user.id},'learning_material_updated','edu_learning_material',${String(id)},${JSON.stringify({ published: Boolean(publishedAt), offline, aiApproved, uploadedFile: Boolean(blobPathname), originalFilename, fileSizeBytes })}::jsonb)`;
+    await sql`insert into edu_audit_logs (actor_user_id,action,entity_type,entity_id,metadata) values (${access.user.id},'learning_material_updated','edu_learning_material',${String(id)},${JSON.stringify({ published: Boolean(publishedAt), offline, uploadedFile: Boolean(blobPathname), originalFilename, fileSizeBytes })}::jsonb)`;
     let email = null;
     if (publishedAt && !material.published_at) {
       const course = (

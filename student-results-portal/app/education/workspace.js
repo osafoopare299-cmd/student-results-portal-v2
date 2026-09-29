@@ -5,7 +5,7 @@ import { useState } from 'react';
 import {
   Activity, BarChart3, Bell, BookOpen, Brain, CalendarDays, CheckCircle2,
   ClipboardCheck, FileText, Flame, GraduationCap, LayoutDashboard, ListTodo, Menu,
-  MessageSquareText, ShieldCheck, Sparkles, Stethoscope, UserCog, UserRound,
+  MessageSquareText, ShieldCheck, Stethoscope, UserCog, UserRound,
   Video, Wifi, X
 } from 'lucide-react';
 import styles from './page.module.css';
@@ -23,8 +23,6 @@ const workspaces = {
       ['Study Planner','Plan revision tasks, deadlines and personal study goals',ListTodo,'/education/student/study-planner'],
       ['Flashcards','Create private cards and revise with spaced repetition',Brain,'/education/student/flashcards'],
       ['Study Rewards','Build streaks, unlock badges and schedule revision reminders',Flame,'/education/student/study-rewards'],
-      ['AI Tutor','Ask questions from approved course materials only',Sparkles,'/education/student/ai-tutor'],
-      ['Practice Analytics','Track AI practice scores, trends, strong topics and weak areas',Activity,'/education/student/practice-analytics'],
       ['Notifications','Results, assignments, timetable and learning updates',Bell,'/education/student/notifications'],
       ['Attendance','Class and rotation attendance summaries',CheckCircle2,'/education/student/attendance'],
       ['Live Classroom','Join video classes, breakout rooms, chat and reactions',Video,'/education/student/live-classroom'],
@@ -90,7 +88,6 @@ export default function Workspace({ role, user=null, dashboard=null }) {
         {learnHref ? <Link href={learnHref}><BookOpen size={18}/> Learning</Link> : <a><BookOpen size={18}/> Learning</a>}
         {assessHref ? <Link href={assessHref}><ClipboardCheck size={18}/> Assessments</Link> : <a><ClipboardCheck size={18}/> Assessments</a>}
         {resultsHref ? <Link href={resultsHref}><BarChart3 size={18}/> Results</Link> : <a><BarChart3 size={18}/> Results</a>}
-        {role==='student' && <Link href="/education/student/practice-analytics"><Activity size={18}/> Practice Analytics</Link>}
         {role==='student' && <Link href="/education/student/study-planner"><ListTodo size={18}/> Study Planner</Link>}
         {role==='student' && <Link href="/education/student/flashcards"><Brain size={18}/> Flashcards</Link>}
         {role==='student' && <Link href="/education/student/study-rewards"><Flame size={18}/> Study Rewards</Link>}

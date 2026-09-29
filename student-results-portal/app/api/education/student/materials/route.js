@@ -14,8 +14,7 @@ export async function GET(){
       select o.id,c.code,c.title,cl.name as class_name,y.name as academic_year,o.term,
              u.full_name as lecturer_name,
              count(m.id)::int as materials_count,
-             count(m.id) filter (where m.is_offline_available=true)::int as offline_count,
-             count(m.id) filter (where m.is_ai_approved=true)::int as ai_count
+             count(m.id) filter (where m.is_offline_available=true)::int as offline_count
       from edu_enrolments e
       join edu_course_offerings o on o.id=e.offering_id
       join edu_courses c on c.id=o.course_id
@@ -29,7 +28,7 @@ export async function GET(){
     `;
     const rows=await sql`
       select m.id,m.offering_id,m.title,m.description,m.material_type,m.resource_url,m.content_text,
-             m.is_offline_available,m.is_ai_approved,m.published_at,m.blob_pathname,m.original_filename,m.file_content_type,m.file_size_bytes,
+             m.is_offline_available,m.published_at,m.blob_pathname,m.original_filename,m.file_content_type,m.file_size_bytes,
              c.code,c.title as course_title,cl.name as class_name,y.name as academic_year,o.term,
              u.full_name as lecturer_name
       from edu_enrolments e

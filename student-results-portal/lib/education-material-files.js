@@ -3,6 +3,11 @@ export async function ensureEducationMaterialFileSchema(sql){
   await sql`alter table edu_learning_materials add column if not exists original_filename text`;
   await sql`alter table edu_learning_materials add column if not exists file_content_type text`;
   await sql`alter table edu_learning_materials add column if not exists file_size_bytes bigint`;
+  await sql`alter table edu_learning_materials add column if not exists is_recommended_book boolean not null default false`;
+  await sql`alter table edu_learning_materials add column if not exists book_author text`;
+  await sql`alter table edu_learning_materials add column if not exists book_edition text`;
+  await sql`alter table edu_learning_materials add column if not exists book_isbn text`;
+  await sql`alter table edu_learning_materials alter column created_by drop not null`;
   await sql`do $$ begin
     if not exists (
       select 1 from pg_constraint
@@ -14,6 +19,7 @@ export async function ensureEducationMaterialFileSchema(sql){
     end if;
   end $$`;
   await sql`create index if not exists edu_learning_materials_blob_path_idx on edu_learning_materials(blob_pathname) where blob_pathname is not null`;
+  await sql`create index if not exists edu_learning_materials_recommended_book_idx on edu_learning_materials(offering_id,published_at desc) where is_recommended_book=true`;
 }
 
 export function educationBlobConfigured(){

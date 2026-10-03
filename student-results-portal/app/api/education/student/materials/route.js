@@ -21,7 +21,7 @@ export async function GET(){
       join edu_classes cl on cl.id=o.class_id
       join edu_academic_years y on y.id=o.academic_year_id
       left join edu_users u on u.id=o.lecturer_user_id
-      left join edu_learning_materials m on m.offering_id=o.id and m.published_at is not null
+      left join edu_learning_materials m on m.offering_id=o.id and m.published_at is not null and m.is_recommended_book=false
       where e.student_user_id=${access.user.id} and e.status='active'
       group by o.id,c.code,c.title,cl.name,y.name,o.term,u.full_name
       order by y.name desc,c.code,cl.name
@@ -33,7 +33,7 @@ export async function GET(){
              u.full_name as lecturer_name
       from edu_enrolments e
       join edu_course_offerings o on o.id=e.offering_id
-      join edu_learning_materials m on m.offering_id=o.id and m.published_at is not null
+      join edu_learning_materials m on m.offering_id=o.id and m.published_at is not null and m.is_recommended_book=false
       join edu_courses c on c.id=o.course_id
       join edu_classes cl on cl.id=o.class_id
       join edu_academic_years y on y.id=o.academic_year_id

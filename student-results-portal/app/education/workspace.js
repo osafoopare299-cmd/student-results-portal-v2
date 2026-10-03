@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import {
-  Activity, BarChart3, Bell, BookOpen, Brain, CalendarDays, CheckCircle2,
+  Activity, BarChart3, Bell, BookMarked, BookOpen, Brain, CalendarDays, CheckCircle2,
   ClipboardCheck, FileText, Flame, GraduationCap, LayoutDashboard, ListTodo, Menu,
   MessageSquareText, ShieldCheck, Stethoscope, UserCog, UserRound,
   Video, Wifi, X
@@ -17,6 +17,7 @@ const workspaces = {
     stats: [['Courses','—'],['Upcoming','—'],['Announcements','—'],['Profile','—']],
     actions: [
       ['Learning Hub','Notes, PDFs, videos and saved offline resources',BookOpen,'/education/student/learn'],
+      ['Recommended Books','Download books selected for your enrolled courses',BookMarked,'/education/student/recommended-books'],
       ['Assessments','MCQs, written tests, viva/OSCE and practicals',ClipboardCheck,'/education/student/assess'],
       ['Results','Published grades, percentages and assessment breakdowns',BarChart3,'/education/student/results'],
       ['Timetable','Classes, rotations, assessments and deadlines',CalendarDays,'/education/student/timetable'],
@@ -35,6 +36,7 @@ const workspaces = {
     stats: [['Courses','—'],['Students','—'],['Upcoming','—'],['Profile','—']],
     actions: [
       ['Course Materials','Upload notes, PDFs, videos and learning resources',FileText,'/education/lecturer/learning'],
+      ['Recommended Books','Upload downloadable course books for students',BookMarked,'/education/lecturer/recommended-books'],
       ['Create Assessment','Build MCQ, written, viva/OSCE and practical assessments',ClipboardCheck,'/education/lecturer/assessments'],
       ['Marks & Results','Mark submissions, finalize scores and release results',BarChart3,'/education/lecturer/assessments'],
       ['Attendance','Create sessions and record attendance',CheckCircle2,'/education/lecturer/attendance'],
@@ -52,6 +54,7 @@ const workspaces = {
       ['Courses & Classes','Courses, classes and core academic catalog',GraduationCap,'/education/admin/catalog'],
       ['Academic Years','Create academic periods and choose the active year',CalendarDays,'/education/admin/academic-years'],
       ['Course Offerings','Connect courses to classes, years, terms and lecturers',BookOpen,'/education/admin/offerings'],
+      ['Recommended Books','Upload and manage downloadable books across courses',BookMarked,'/education/admin/recommended-books'],
       ['Enrolments & Assignments','Enrol students and assign lecturers',ClipboardCheck,'/education/admin/assignments'],
       ['Grading Scheme','Configure grade boundaries and PASS/REVIEW outcomes',CheckCircle2,'/education/admin/grading'],
       ['Result Publication','Review finalized Education marks and release them to students',BarChart3,'/education/admin/results'],
@@ -86,6 +89,7 @@ export default function Workspace({ role, user=null, dashboard=null }) {
       <nav>
         <Link className={styles.active} href={`/education/${role}`}><LayoutDashboard size={18}/> Dashboard</Link>
         {learnHref ? <Link href={learnHref}><BookOpen size={18}/> Learning</Link> : <a><BookOpen size={18}/> Learning</a>}
+        <Link href={`/education/${role}/recommended-books`}><BookMarked size={18}/> Recommended Books</Link>
         {assessHref ? <Link href={assessHref}><ClipboardCheck size={18}/> Assessments</Link> : <a><ClipboardCheck size={18}/> Assessments</a>}
         {resultsHref ? <Link href={resultsHref}><BarChart3 size={18}/> Results</Link> : <a><BarChart3 size={18}/> Results</a>}
         {role==='student' && <Link href="/education/student/study-planner"><ListTodo size={18}/> Study Planner</Link>}

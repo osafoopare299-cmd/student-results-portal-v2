@@ -9,7 +9,13 @@ export const EDUCATION_FILE_CONTENT_TYPES=[
   'text/plain','text/csv','text/markdown','application/rtf',
   'image/jpeg','image/png','image/gif','image/webp','image/svg+xml',
   'audio/mpeg','audio/mp4','audio/wav','audio/ogg',
-  'application/zip','application/x-zip-compressed','application/octet-stream'
+  'application/zip','application/x-zip-compressed','application/octet-stream',
+  'application/epub+zip','application/x-mobipocket-ebook','application/vnd.amazon.ebook'
+];
+
+export const EDUCATION_BOOK_CONTENT_TYPES=[
+  'application/pdf','application/epub+zip','application/x-mobipocket-ebook',
+  'application/vnd.amazon.ebook','application/octet-stream'
 ];
 
 export const EDUCATION_VIDEO_CONTENT_TYPES=['video/mp4','video/webm','video/quicktime','video/x-msvideo','video/mpeg'];

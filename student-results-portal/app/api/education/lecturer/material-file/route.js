@@ -11,7 +11,9 @@ export async function GET(request){
   if(!access.ok)return NextResponse.json({ok:false,error:'Lecturer access required.'},{status:401});
   if(!educationBlobConfigured())return NextResponse.json({ok:false,error:'File storage is not configured.'},{status:503});
   try{
-    const materialId=Number(new URL(request.url).searchParams.get('materialId'));
+    const searchParams=new URL(request.url).searchParams;
+    const materialId=Number(searchParams.get('materialId'));
+    const download=searchParams.get('download')==='1';
     if(!Number.isFinite(materialId))return NextResponse.json({ok:false,error:'Material is required.'},{status:400});
     const sql=getEducationSql();await ensureEducationMaterialFileSchema(sql);
     const material=(await sql`select m.id,m.blob_pathname,m.original_filename,m.file_content_type from edu_learning_materials m join edu_course_offerings o on o.id=m.offering_id where m.id=${materialId} and m.created_by=${access.user.id} and o.lecturer_user_id=${access.user.id} and m.blob_pathname is not null limit 1`)[0];
@@ -21,7 +23,7 @@ export async function GET(request){
     const filename=String(material.original_filename||'learning-resource').replace(/[\r\n"]/g,'');
     return new NextResponse(result.stream,{headers:{
       'Content-Type':result.blob?.contentType||material.file_content_type||'application/octet-stream',
-      'Content-Disposition':`inline; filename="${filename}"`,
+      'Content-Disposition':`${download?'attachment':'inline'}; filename="${filename}"`,
       'Cache-Control':'private, no-store',
       'X-Content-Type-Options':'nosniff'
     }});
